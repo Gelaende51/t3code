@@ -458,7 +458,13 @@ const makeAdapter = Effect.fnUntraced(function* (
       displayName: undefined,
       enabled: true,
       environment: [],
-      config: { enabled: true, binaryPath: "pi", launchArgs, customModels: [] },
+      config: {
+        enabled: true,
+        binaryPath: "pi",
+        launchArgs,
+        trustProjectResources: true,
+        customModels: [],
+      },
     }).pipe(
       Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
       Effect.provideService(HostProcess.Environment, {}),
@@ -470,7 +476,13 @@ const makeAdapter = Effect.fnUntraced(function* (
   }
   return yield* makePiAdapterV2({
     instanceId: PI_INSTANCE_ID,
-    settings: { enabled: true, binaryPath: "pi", launchArgs, customModels: [] },
+    settings: {
+      enabled: true,
+      binaryPath: "pi",
+      launchArgs,
+      trustProjectResources: true,
+      customModels: [],
+    },
     environment: {},
   }).pipe(Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner));
 });
@@ -1691,6 +1703,8 @@ describe("PiAdapterV2", () => {
       const fake = yield* makeFakePi;
       yield* openRuntime(fake);
       const spawn = fake.lastSpawn();
+      assert.isTrue(spawn.args.includes("--approve"));
+      assert.isFalse(spawn.args.includes("--no-approve"));
       assert.isTrue(spawn.args.includes("--extension"));
       const extensions = spawn.args.flatMap((arg, index) =>
         arg === "--extension" ? [spawn.args[index + 1]] : [],

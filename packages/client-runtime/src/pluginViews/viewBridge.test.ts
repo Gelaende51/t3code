@@ -36,6 +36,7 @@ const mount = Effect.fn("mount")(function* (
   const posted: Array<PluginViewHostMessage> = [];
   const closes: Array<PluginViewCloseReason> = [];
   const calls: Array<{ handler: string; input: Schema.Json }> = [];
+  const reveals: Array<{ messageId: string; query: string }> = [];
   let portClosed = false;
   const bridge = yield* makePluginViewBridge({
     view: VIEW,
@@ -49,10 +50,20 @@ const mount = Effect.fn("mount")(function* (
       calls.push({ handler, input });
       return answer(handler, input);
     },
+    onReveal: (messageId, query) => reveals.push({ messageId, query }),
     onClose: (reason) => closes.push(reason),
   }).pipe(Scope.provide(scope));
   const send = (message: unknown) => bridge.receive(stringify(message), 0);
-  return { bridge, scope, posted, closes, calls, send, portClosed: () => portClosed };
+  return {
+    bridge,
+    scope,
+    posted,
+    closes,
+    calls,
+    reveals,
+    send,
+    portClosed: () => portClosed,
+  };
 });
 
 describe("makePluginViewBridge", () => {
@@ -87,6 +98,17 @@ describe("makePluginViewBridge", () => {
         },
         { _tag: "error", id: 4, code: "too-large", message: "The answer is too large." },
       ]);
+    }),
+  );
+
+  it.effect("hands a reveal to the host without answering it", () =>
+    Effect.gen(function* () {
+      const { posted, reveals, send } = yield* mount();
+      send({ _tag: "reveal", messageId: "message-1", query: "  Heading  " });
+      expect(reveals).toEqual([{ messageId: "message-1", query: "Heading" }]);
+      expect(posted).toEqual([{ _tag: "init", ...VIEW }]);
+      send({ _tag: "reveal", messageId: "", query: "Heading" });
+      expect(posted.at(-1)).toEqual({ _tag: "violation", reason: "invalid" });
     }),
   );
 

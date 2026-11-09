@@ -1,0 +1,17 @@
+{
+  "name": "t3-plugin-thread-digest",
+  "version": "1.0.0",
+  "description": "Shows how each finished T3 Code run ended as a thread status and a notification.",
+  "keywords": [
+    "runs",
+    "t3-code",
+    "t3-plugin"
+  ],
+  "license": "MIT",
+  "files": [
+    "t3-plugin.json",
+    "main.mjs"
+  ],
+  "type": "module",
+  "main": "main.mjs"
+}

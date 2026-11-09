@@ -7,6 +7,8 @@ Keep items concrete: symptom, evidence, root cause, proposal, tests.
 
 - [ ] **1. Steer silently restarts the turn on restart-only providers (ACP)** — see §1
 - [ ] **2. Invisible messages on some new threads** — see §2
+- [ ] **3. Sync threads across all devices** (feature) — see §3
+- [ ] **4. Route provider requests through another computer** (feature) — see §4
 
 ---
 
@@ -151,3 +153,147 @@ test yet.
 3. If the projection has the message, inspect the client thread-workflow hydration
    and `MessagesTimeline` row grouping; add a regression test at the failing layer.
 4. Record the exact T3 version and surface (web/desktop/mobile) in the next report.
+
+---
+
+## 3. Sync threads across all devices
+
+Feature gap, not a bug: same-environment multi-device access already works, cross-environment
+continuity does not.
+
+### Symptom
+
+Two environments show different thread lists. The desktop app's bundled server at home and a
+`t3` server on a VPS each own a separate `statev2.sqlite`, so a thread started on one is invisible
+and unreachable on the other. The phone only lists threads of environments it has added. Moving
+between machines means re-creating or abandoning the conversation.
+
+### Current state
+
+- Inside one environment, sync already works: every client reads the same projections from the
+  environment's database, and remote access (direct, Tailscale, T3 Connect) only changes the route.
+  The current answer to "threads on all devices" is "add the one server everywhere".
+- Across environments there is nothing. [remote.md](docs/internals/remote.md) is explicit: a project
+  and its threads belong to one environment; a peer link lets an agent _read_ another environment's
+  threads, it does not copy them.
+- `thread.fork` / `thread.merge_back`
+  ([orchestrationV2.ts:3351](packages/contracts/src/orchestrationV2.ts),
+  [:3362](packages/contracts/src/orchestrationV2.ts)) and the `t3_thread_transfer` tool move context
+  between threads of the _same_ environment only.
+- No export/import either: [thread-migration.md](docs/user/thread-migration.md) says there is no
+  whole-thread export command.
+
+### Proposal
+
+Mirror, do not replicate the event log.
+
+1. **Owner and follower.** Each thread has one authoritative environment. A follower stores a
+   read-only copy: thread metadata, user/assistant messages, terminal run summaries. Never provider
+   sessions, checkpoints, terminals, queued runs, or live activity.
+2. **Transport.** The follower subscribes to the owner over its existing authenticated connection
+   (pairing or T3 Connect; peer link credentials can carry it). Batches commit with
+   `(environmentId, threadId, messageId)` dedupe and a per-thread cursor; on reconnect the follower
+   catches up from that cursor. No second protocol, no inbound port on home.
+3. **One writer.** Sending from a mirrored thread still goes to the owner, so it stays the single
+   writer. "Continue here" is the reverse door: fork ownership at the latest point, end the mirror,
+   and the old owner keeps its copy as history.
+4. **Metadata.** Title, pin, snooze, archive and settlement are last-writer-wins by `updatedAt`,
+   owner wins ties; archive/unarchive mirror as tombstones so sync cannot resurrect a deleted thread.
+5. **Attachments.** Fetch lazily from the owner through the same connection; do not copy blobs into
+   the follower's `userdata`.
+6. **UI.** Sidebar groups mirrored threads under their owner with a small environment badge.
+   Settings toggle per environment (and later per project); turning it off removes local copies and
+   the cursor, never the owner's thread.
+
+### Files to touch
+
+- `packages/contracts` — mirror commands/events plus a sync cursor shape (new namespace, not
+  `thread.*`, so replay stays explicit about what it may contain).
+- `apps/server/src/peer/PeerLinks.ts` — peer session reuse or a dedicated sync endpoint.
+- New server service that owns the subscriber, dedupe and cursor; transports stay thin.
+- `packages/client-runtime/src/state` — merge local and mirrored threads into sidebar read models.
+- `apps/web` sidebar + thread view read-only state; `apps/mobile` thread list.
+
+### Tests
+
+- Re-delivering a batch is idempotent (same message ids, no duplicated timeline rows).
+- Follower offline for a while catches up to the same message order; a gap refuses to render rather
+  than skipping silently.
+- `thread.merge_back` on a mirrored thread fails; "continue here" forks ownership and stops the mirror.
+- Mirror never writes checkpoints, runs or provider state into the follower database.
+- Metadata LWW: owner update newer than follower edit wins; tie keeps owner.
+- Turning sync off removes the copy; the owner's thread survives a follower restart.
+
+### Open questions
+
+- Account-level (every machine auto-mirrors) vs. an explicit per-environment pair.
+- What happens when the owner is offline: queue the send, or show the mirrored thread as read-only?
+- Privacy and retention of copied transcripts on a shared VPS, and size limits on long histories.
+
+---
+
+## 4. Route provider requests through another computer
+
+Feature gap, not a bug: work should run on the VPS, but provider traffic should leave from home.
+
+### Symptom
+
+Providers see the environment server's public IP. Running T3 on a CI runner or VPS means Claude,
+Codex, and the rest see a datacenter address: geo restrictions, different rate-limit buckets, account
+anomaly checks, and "new location" verification. Expected: run the agent on the VPS, make the
+provider requests look like they come from home.
+
+### Current state
+
+- Provider CLIs are subprocesses of the environment server (`apps/server/src/provider/Drivers/*`,
+  `ClaudeProvider.ts`, `CodexProvider.ts`) and inherit the host network. Provider instance settings
+  (`.t3/userdata/settings.json` → `providerInstances`) configure executable, args and auth only.
+- T3's own `fetch` already honors an ambient HTTP proxy
+  ([outboundHttp.ts](apps/server/src/outboundHttp.ts), `NODE_USE_ENV_PROXY` / `--use-env-proxy`), but
+  nothing sets it per provider, and provider children only benefit if their own HTTP stack honors
+  `HTTPS_PROXY`.
+- Workaround today: a host-level Tailscale exit node or VPN on the VPS. Works, but all traffic is
+  routed, it is not per provider, and it needs host access.
+- Nothing verifies what address a provider actually uses, so a silently missing proxy looks like a
+  working setup until the account gets flagged.
+
+### Proposal
+
+1. **Peer-hosted CONNECT proxy.** The home environment starts a local HTTP `CONNECT` proxy and
+   exposes it over the existing outbound peer link (no inbound port, no new tunnel binary). The VPS
+   sets `HTTPS_PROXY` / `HTTP_PROXY` plus `NO_PROXY=127.0.0.1,localhost,::1` on that provider's child
+   env only.
+2. **No MITM.** `CONNECT` keeps TLS end-to-end, so no certificate install and the proxy sees
+   hostnames only. Stream the tunnel; never buffer or persist payloads.
+3. **Per instance setting** `egress: "direct" | "peer:<environmentId>"` on the provider instance.
+   A **Check egress** action fetches an IP echo endpoint through the tunnel and shows the observed
+   address; a turn whose provider launched without the configured egress warns instead of going
+   direct silently.
+4. **CLIs that ignore proxy env** (bundled network stacks, certificate pinning) fall back to the
+   documented host exit node; the same check proves it, and the setting must not pretend to work.
+5. **Scope.** Provider API, auth-token refresh and usage traffic only. Local MCP, OAuth loopback
+   callbacks, preview servers, git and source-control calls stay direct through `NO_PROXY`.
+
+### Files to touch
+
+- `apps/server/src/peer/PeerLinks.ts` — proxy endpoint over the existing peer session.
+- Provider child env construction in the drivers and `ClaudeProvider.ts` / `CodexProvider.ts` /
+  `CodexInstallation.ts`; proxy URL comes from the instance, not `process.env`.
+- `packages/contracts/src/settings.ts` — `providerInstances` gains `egress`.
+- `apps/web` provider instance settings: egress picker, **Check egress**, warning state.
+
+### Tests
+
+- Child env gets the proxy (and `NO_PROXY`) only for the provider instance that selected it.
+- Loopback stays direct: a local MCP/OAuth callback never traverses the tunnel.
+- The proxy refuses plaintext and non-`CONNECT` requests.
+- Egress check failure surfaces without blocking the turn; the next turn still starts.
+- Tunnel reconnect during a streamed response: the provider call fails or retries, it never hangs.
+
+### Open questions
+
+- Open proxy vs. an allowlist of provider hosts. Allowlists drift with every provider version; an
+  open proxy on a peer is a relay if credentials leak.
+- Browser-based logins (Codex/Claude OAuth) that happen on the user's device, not the server: route
+  or leave direct?
+- Extra tunnel RTT on every request and streamed token; measure before promising it is invisible.

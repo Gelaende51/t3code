@@ -99,8 +99,9 @@ and use `context.proposed`. A manifest T3 Code cannot honor is refused when the 
 the reason. Each `context.proposed.handle(name, handler)` registers one entry point the server calls.
 
 For complete plugins to copy from, see [examples/plugins](../../examples/plugins/): a turn
-notifier (events and notifications), an agent tool that counts TODO comments, and a configurable
-thread label (settings and status).
+notifier (events and notifications), an agent tool that counts TODO comments, a configurable thread
+label (settings and status), a `/goal` action (actions, settings, status, transforms, and approvals),
+and a run digest (events, settings, status, and notifications).
 
 ### Events
 
@@ -184,11 +185,14 @@ menu. Views are not available in the mobile apps yet.
 
 A view runs in an isolated frame. It cannot read T3 Code's pages, storage or connection, load other
 files, or reach the network; inline images and fonts as `data:` URLs. Its script finds `t3View` on
-`window`: `t3View.ready` resolves once connected, and `t3View.call(handler, input)` reaches
-`context.proposed.handle("view:<view id>:<handler>", handler)`. Inputs and answers are JSON of at
-most 64 KiB, and a call fails after 30 seconds. A view that floods messages or stops answering is
-stopped; **Reload** in its tab starts it again. Disabling or removing the plugin, or a file check
-finding it changed, closes its views on every client, and they come back when it is enabled again.
+`window`: `t3View.ready` resolves once connected with the view's own ids, plus `threadId` and
+`environmentId` when the host knows the thread whose panel mounts it. `t3View.call(handler, input)`
+reaches `context.proposed.handle("view:<view id>:<handler>", handler)`. Inputs and answers are JSON
+of at most 64 KiB, and a call fails after 30 seconds. `t3View.reveal(messageId, query)` asks the
+host to bring a message of the mounted thread into view; it is one-way, returns no data, and a host
+may ignore it. A view that floods messages or stops answering is stopped; **Reload** in its tab
+starts it again. Disabling or removing the plugin, or a file check finding it changed, closes its
+views on every client, and they come back when it is enabled again.
 
 ### Statuses
 

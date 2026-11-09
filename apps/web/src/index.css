@@ -422,6 +422,41 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   );
 }
 
+/* One-shot reveal from a plugin view: the overlay plays once and removes itself. */
+.thread-reveal-flash {
+  z-index: 80;
+  border-radius: 4px;
+  pointer-events: none;
+  background: color-mix(
+    in oklab,
+    var(--app-theme-search-match-active-background, oklch(0.774202 0.151946 74.331)) 42%,
+    transparent
+  );
+  box-shadow: 0 0 0 2px
+    color-mix(
+      in oklab,
+      var(--app-theme-search-match-active-background, oklch(0.774202 0.151946 74.331)) 70%,
+      transparent
+    );
+  animation: thread-reveal-flash 1s ease-out forwards;
+  will-change: opacity, transform;
+}
+
+@keyframes thread-reveal-flash {
+  0% {
+    opacity: 0.95;
+    transform: scale(1.03);
+  }
+  55% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
 @utility dialog-glass {
   background: color-mix(in srgb, var(--background) var(--glass-opacity), transparent);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));

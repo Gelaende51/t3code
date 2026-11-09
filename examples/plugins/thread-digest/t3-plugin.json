@@ -1,0 +1,19 @@
+{
+  "id": "example.thread-digest",
+  "name": "Thread digest",
+  "version": "1.0.0",
+  "description": "Shows how each finished run ended as a thread status and a notification.",
+  "apiVersion": 1,
+  "entry": "main.mjs",
+  "proposedApi": true,
+  "capabilities": ["events", "settings", "status", "notifications"],
+  "settings": [
+    {
+      "type": "boolean",
+      "key": "onlyProblems",
+      "label": "Only failed or stopped runs",
+      "default": false,
+      "description": "Leave off to note every finished run; turn on to note only runs that failed, were interrupted or cancelled, or could not finish."
+    }
+  ]
+}

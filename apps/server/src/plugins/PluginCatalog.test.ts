@@ -217,6 +217,21 @@ const isProcessAlive = (pid: number) => {
 const withDatabase = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   effect.pipe(Effect.provide(SqlitePersistence.layerMemory));
 
+const withDevAutoConsent = <A, E, R>(directory: string, effect: Effect.Effect<A, E, R>) =>
+  Effect.acquireUseRelease(
+    Effect.sync(() => {
+      const previous = process.env.T3CODE_PLUGIN_DEV_AUTO_CONSENT;
+      process.env.T3CODE_PLUGIN_DEV_AUTO_CONSENT = directory;
+      return previous;
+    }),
+    () => effect,
+    (previous) =>
+      Effect.sync(() => {
+        if (previous === undefined) delete process.env.T3CODE_PLUGIN_DEV_AUTO_CONSENT;
+        else process.env.T3CODE_PLUGIN_DEV_AUTO_CONSENT = previous;
+      }),
+  );
+
 it.layer(NodeServices.layer)("PluginCatalog", (it) => {
   it.effect("revokes changed code even when persisting its disabled record fails", () =>
     withDatabase(
@@ -248,6 +263,36 @@ it.layer(NodeServices.layer)("PluginCatalog", (it) => {
           readonly record_json: string;
         }>`SELECT record_json FROM plugin_installations WHERE installation_id = ${installationId}`;
         expect(JSON.parse(saved[0]!.record_json).enabled).toBe(false);
+      }),
+    ),
+  );
+
+  it.effect("auto-consents changed bytes for a development allowlist", () =>
+    withDatabase(
+      Effect.gen(function* () {
+        const stub = yield* makeStubSupervisor;
+        const catalog = yield* startStubCatalog(yield* Scope.Scope, stub.service);
+        const plugin = yield* preparePlugin("test.dev-auto-consent");
+        const added = yield* catalog.add({ directory: plugin.directory });
+        const installationId = added.installation.installationId;
+        yield* catalog.consent({
+          installationId,
+          digest: added.installation.source!.digest,
+        });
+        const enabled = yield* catalog.enable({ installationId });
+        const before = enabled.installation;
+        const refreshed = yield* withDevAutoConsent(
+          plugin.directory,
+          Effect.gen(function* () {
+            yield* plugin.edit("changed for dev");
+            return yield* catalog.refresh({ installationId });
+          }),
+        );
+        const after = refreshed.installations[0]!;
+        expect(after.enabled).toBe(true);
+        expect(after.consent?.digest).toBe(after.source?.digest);
+        expect(after.generation).toBe(before.generation + 1);
+        expect(stub.registrations.size).toBe(1);
       }),
     ),
   );

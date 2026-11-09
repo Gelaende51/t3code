@@ -29,13 +29,22 @@ export const PiSettings = makeProviderSettingsSchema(
         providerSettingsForm: { clearWhenEmpty: "omit" },
       }),
     ),
+    trustProjectResources: Schema.Boolean.pipe(
+      Schema.withDecodingDefault(Effect.succeed(true)),
+      Schema.annotateKey({
+        title: "Trust project files",
+        description:
+          "Load project settings, extensions, skills, prompts, MCP servers, and system prompt files from the workspace. T3 Code launches Pi with --approve; turn this off to launch with --no-approve instead.",
+        providerSettingsForm: { control: "switch" },
+      }),
+    ),
     customModels: Schema.Array(CustomModelSetting).pipe(
       Schema.withDecodingDefault(Effect.succeed([])),
       Schema.annotateKey({ providerSettingsForm: { hidden: true } }),
     ),
   },
   {
-    order: ["binaryPath", "launchArgs"],
+    order: ["binaryPath", "launchArgs", "trustProjectResources"],
   },
 );
 export type PiSettings = typeof PiSettings.Type;

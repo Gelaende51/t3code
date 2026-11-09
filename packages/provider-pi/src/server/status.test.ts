@@ -118,6 +118,7 @@ const settings = {
   enabled: true,
   binaryPath: "pi",
   launchArgs: "",
+  trustProjectResources: true,
   customModels: [],
 } as const;
 

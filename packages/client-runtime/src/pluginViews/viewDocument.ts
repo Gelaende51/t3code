@@ -44,7 +44,7 @@ export const PLUGIN_VIEW_BOOTSTRAP_SOURCE = `(() => {
     let message;
     try { message = JSON.parse(event.data); } catch { return; }
     if (message === null || typeof message !== "object") return;
-    if (message._tag === "init") resolveReady(Object.freeze({ pluginId: message.pluginId, viewId: message.viewId, title: message.title }));
+    if (message._tag === "init") resolveReady(Object.freeze({ pluginId: message.pluginId, viewId: message.viewId, title: message.title, threadId: message.threadId, environmentId: message.environmentId }));
     else if (message._tag === "ping") send({ _tag: "pong", n: message.n });
     else if (message._tag === "result") settle(message.id, (call) => call.resolve(message.value));
     else if (message._tag === "error") settle(message.id, (call) => call.reject(failure(message.code, message.message)));
@@ -91,6 +91,11 @@ export const PLUGIN_VIEW_BOOTSTRAP_SOURCE = `(() => {
       port.postMessage(text);
     });
   });
+  const reveal = (messageId, query) => {
+    if (typeof messageId !== "string" || messageId.length === 0 || messageId.length > 4096) return Promise.reject(failure("invalid", "The message id is invalid."));
+    if (typeof query !== "string" || query.length === 0 || query.length > 512) return Promise.reject(failure("invalid", "The reveal query is invalid."));
+    return ready.then(() => { send({ _tag: "reveal", messageId, query }); });
+  };
   window.addEventListener("message", (event) => {
     const data = event.data;
     if (data === null || typeof data !== "object" || data.type !== "${PLUGIN_VIEW_CONNECT_MESSAGE}") return;
@@ -99,12 +104,12 @@ export const PLUGIN_VIEW_BOOTSTRAP_SOURCE = `(() => {
     port = event.ports[0];
     port.onmessage = receive;
   });
-  Object.defineProperty(window, "t3View", { value: Object.freeze({ ready, call }) });
+  Object.defineProperty(window, "t3View", { value: Object.freeze({ ready, call, reveal }) });
   host.postMessage({ type: "${PLUGIN_VIEW_READY_MESSAGE}" }, "*");
 })();`;
 
 /** Base64 SHA-256 of `PLUGIN_VIEW_BOOTSTRAP_SOURCE`; a test keeps them in step. */
-export const PLUGIN_VIEW_BOOTSTRAP_SHA256 = "ct0RJkh/B5f81yANQ/pOR46WVF3JWK5yc+fQtXGZ4YU=";
+export const PLUGIN_VIEW_BOOTSTRAP_SHA256 = "EudrKvcKlE7ThsjQRapZO1l3lQAMEwYHsxVqm5Z7Zlk=";
 
 class PluginViewDocumentError extends Schema.TaggedError<PluginViewDocumentError>()(
   "PluginViewDocumentError",

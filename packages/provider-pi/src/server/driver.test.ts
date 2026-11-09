@@ -123,6 +123,10 @@ const create = (config: Partial<PiSettings> = {}, enabled = true) =>
     config: { ...PiDriver.defaultConfig(), binaryPath: "custom-pi", ...config },
   });
 
+it("trusts project resources by default", () => {
+  assert.isTrue(PiDriver.defaultConfig().trustProjectResources);
+});
+
 it.layer(layerTest)("PiDriver workspace discovery", (it) => {
   it.effect("keeps each workspace's skills and commands separate from the machine catalog", () =>
     Effect.gen(function* () {

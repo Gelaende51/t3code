@@ -72,10 +72,18 @@ const failureOf = (error: unknown) =>
 
 export const makePluginViewBridge = Effect.fnUntraced(function* <E, R>(options: {
   /** Sent to the view as `init`, the first message on the port. */
-  readonly view: { readonly pluginId: string; readonly viewId: string; readonly title: string };
+  readonly view: {
+    readonly pluginId: string;
+    readonly viewId: string;
+    readonly title: string;
+    readonly threadId?: string;
+    readonly environmentId?: string;
+  };
   readonly port: PluginViewPort;
   /** Calls the bound view's plugin handler; the host fixes the target. */
   readonly call: (handler: string, input: Schema.Json) => Effect.Effect<Schema.Json, E, R>;
+  /** A view asked its host to bring a message of the mounted thread into view. */
+  readonly onReveal?: (messageId: string, query: string) => void;
   /** Told once, when the mount ends for any reason. The host then removes the frame. */
   readonly onClose: (reason: PluginViewCloseReason) => void;
 }) {
@@ -215,6 +223,16 @@ export const makePluginViewBridge = Effect.fnUntraced(function* <E, R>(options: 
       case "pong":
         if (message.value.n === awaitedPing) awaitedPing = null;
         return;
+      case "reveal": {
+        const { messageId, query } = message.value;
+        if (messageId.length === 0 || query.trim().length === 0) return violation("invalid");
+        try {
+          options.onReveal?.(messageId, query.trim());
+        } catch {
+          return violation("invalid");
+        }
+        return;
+      }
     }
   };
 

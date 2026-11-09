@@ -112,12 +112,13 @@ const start = Effect.fn("start")(function* () {
         | { readonly operation: string }
       )
     >,
+    idPrefix = "event",
   ) => {
     const events = turns.map((turn, index) => ({
       ...("outcome" in turn
         ? { type: "run.finalized", outcome: turn.outcome }
         : { type: "run.finalization-failed", operation: turn.operation }),
-      deliveryId: `event-${index}`,
+      deliveryId: `${idPrefix}-${index}`,
       sequence: index,
       occurredAt: "2026-10-04T00:00:00.000Z",
       environmentId,
@@ -130,7 +131,7 @@ const start = Effect.fn("start")(function* () {
     return catalog.invoke(installationId, PLUGIN_EVENTS_HANDLER, { events });
   };
 
-  return { store, notifications, settings, tools, install, finishTurns };
+  return { catalog, store, notifications, settings, tools, install, finishTurns };
 });
 
 /** `thread: source item=text (tone)` per plugin status, in snapshot order. */
@@ -303,6 +304,204 @@ it.layer(NodeServices.layer)("example plugins", (it) => {
             .pipe(Effect.flip);
           assert.strictEqual(relative.reason, "failed");
           assert.include(relative.message, "absolute directory path");
+        }),
+      ),
+    );
+  });
+
+  describe("goal-command", () => {
+    it.effect("captures the next message as the goal, injects it, and gates approvals", () =>
+      withDatabase(
+        Effect.gen(function* () {
+          const { catalog, install, settings, store } = yield* start();
+          const installationId = yield* install("goal-command");
+          const source = toJson(["plugin", "example.goal"]);
+          const target = {
+            kind: "thread",
+            threadId: THREAD_A,
+            projectId: "project-a",
+            cwd: "/work/project-a",
+            branch: "main",
+          };
+          const approvalContext = {
+            environmentId,
+            projectId: "project-a",
+            threadId: THREAD_A,
+            runId: "run-1",
+            provider: "codex",
+          };
+          const enrich = (text: string) =>
+            catalog.invoke(installationId, "t3.transform.enrich", {
+              environmentId,
+              projectId: "project-a",
+              threadId: THREAD_A,
+              runId: "run-1",
+              cwd: "/work/project-a",
+              message: { text, truncated: false },
+            });
+          const decide = (kind: string, subject: string) =>
+            catalog.invoke(installationId, "t3.approval.decide", {
+              requestId: `request-${kind}-${subject.length}`,
+              kind,
+              prompt: "Allow this?",
+              subject,
+              context: approvalContext,
+            });
+          const contextOf = (result: Schema.Json) =>
+            (result as { context: ReadonlyArray<{ title: string; text: string }> }).context;
+
+          assert.deepStrictEqual(
+            yield* catalog.invoke(installationId, "action:goal", { action: "goal", target }),
+            { message: "Describe the goal in your next message." },
+          );
+          assert.deepStrictEqual(yield* statuses(store), [
+            `thread-a: ${source} goal=Goal: describe it in your next message (warning)`,
+          ]);
+
+          const captured = contextOf(yield* enrich("Ship the login rewrite"));
+          assert.strictEqual(captured[0]?.title, "Thread goal");
+          assert.match(captured[0]?.text ?? "", /Ship the login rewrite/);
+          assert.deepStrictEqual(yield* statuses(store), [
+            `thread-a: ${source} goal=Goal: Ship the login rewrite (info)`,
+          ]);
+
+          const later = contextOf(yield* enrich("Check the tests"));
+          assert.match(later[0]?.text ?? "", /Ship the login rewrite/);
+
+          assert.deepStrictEqual(yield* decide("file-change", "src/login.ts"), null);
+          const outside = (yield* decide("file-change", "/tmp/outside.ts")) as {
+            decision: string;
+            reason: string;
+          };
+          assert.strictEqual(outside.decision, "deny");
+          assert.include(outside.reason, "/work/project-a");
+
+          yield* settings.update({
+            installationId,
+            changes: [{ key: "allowedCommands", value: "pnpm test\ngit status" }],
+          });
+          assert.deepStrictEqual(yield* decide("command", "pnpm test --run"), null);
+          const blocked = (yield* decide("command", "curl http://example.com")) as {
+            decision: string;
+          };
+          assert.strictEqual(blocked.decision, "deny");
+
+          assert.deepStrictEqual(
+            yield* catalog.invoke(installationId, "action:goal", { action: "goal", target }),
+            { message: "Goal cleared." },
+          );
+          assert.deepStrictEqual(yield* statuses(store), []);
+          assert.deepStrictEqual(yield* enrich("Anything else?"), null);
+        }),
+      ),
+    );
+  });
+
+  describe("thread-digest", () => {
+    it.effect("notes each finished run as a status and a notification", () =>
+      withDatabase(
+        Effect.gen(function* () {
+          const { install, finishTurns, notifications, store } = yield* start();
+          const installationId = yield* install("thread-digest");
+          const source = toJson(["plugin", "example.thread-digest"]);
+
+          yield* finishTurns(installationId, [
+            { threadId: THREAD_A, title: "Fix login", outcome: "completed" },
+            { threadId: THREAD_B, title: "Upgrade deps", outcome: "failed" },
+            { threadId: THREAD_A, title: "Fix login", operation: "capture-checkpoint" },
+          ]);
+
+          const frame = yield* Stream.runHead(notifications.subscribe).pipe(
+            Effect.map(Option.getOrThrow),
+          );
+          assert.deepStrictEqual(
+            frame.notifications.map(({ title, body, tone, threadId }) => ({
+              title,
+              body: body ?? null,
+              tone,
+              threadId,
+            })),
+            [
+              {
+                title: "Completed: Fix login",
+                body: null,
+                tone: "success",
+                threadId: THREAD_A,
+              },
+              {
+                title: "Failed: Upgrade deps",
+                body: null,
+                tone: "error",
+                threadId: THREAD_B,
+              },
+              {
+                title: "Finishing failed: Fix login",
+                body: "Saving the checkpoint failed.",
+                tone: "warning",
+                threadId: THREAD_A,
+              },
+            ],
+          );
+          assert.deepStrictEqual(yield* statuses(store), [
+            `thread-a: ${source} last-run=Finishing failed (warning)`,
+            `thread-b: ${source} last-run=Failed (error)`,
+          ]);
+        }),
+      ),
+    );
+
+    it.effect("can note only failed or stopped runs", () =>
+      withDatabase(
+        Effect.gen(function* () {
+          const { install, finishTurns, notifications, settings, store } = yield* start();
+          const installationId = yield* install("thread-digest");
+          const source = toJson(["plugin", "example.thread-digest"]);
+          yield* settings.update({
+            installationId,
+            changes: [{ key: "onlyProblems", value: true }],
+          });
+
+          yield* finishTurns(installationId, [
+            { threadId: THREAD_A, title: "Done", outcome: "completed" },
+            { threadId: THREAD_B, title: "Stopped", outcome: "interrupted" },
+          ]);
+
+          const frame = yield* Stream.runHead(notifications.subscribe).pipe(
+            Effect.map(Option.getOrThrow),
+          );
+          assert.deepStrictEqual(
+            frame.notifications.map(({ title, tone, threadId }) => ({ title, tone, threadId })),
+            [{ title: "Interrupted: Stopped", tone: "warning", threadId: THREAD_B }],
+          );
+          assert.deepStrictEqual(yield* statuses(store), [
+            `thread-b: ${source} last-run=Interrupted (warning)`,
+          ]);
+        }),
+      ),
+    );
+
+    it.effect("does not note a redelivered event twice", () =>
+      withDatabase(
+        Effect.gen(function* () {
+          const { install, finishTurns, notifications } = yield* start();
+          const installationId = yield* install("thread-digest");
+          const page = [{ threadId: THREAD_A, title: "Fix login", outcome: "completed" }];
+
+          yield* finishTurns(installationId, page, "first");
+          yield* finishTurns(installationId, page, "first");
+          yield* finishTurns(
+            installationId,
+            [{ threadId: THREAD_B, title: "Next", outcome: "failed" }],
+            "second",
+          );
+
+          const frame = yield* Stream.runHead(notifications.subscribe).pipe(
+            Effect.map(Option.getOrThrow),
+          );
+          assert.deepStrictEqual(
+            frame.notifications.map(({ title }) => title),
+            ["Completed: Fix login", "Failed: Next"],
+          );
         }),
       ),
     );

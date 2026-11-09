@@ -123,8 +123,13 @@ export function awaitPluginViewReady(options: {
 export const runPluginViewMount = Effect.fnUntraced(function* <E, R>(options: {
   readonly port: MessagePort;
   readonly view: Pick<PluginView, "pluginId" | "viewId" | "title">;
+  /** The thread whose panel owns this mount, for views that act on that thread. */
+  readonly threadId?: string;
+  readonly environmentId?: string;
   /** Bound by the host to the mount's environment, installation, generation and view. */
   readonly call: (handler: string, input: Schema.Json) => Effect.Effect<Schema.Json, E, R>;
+  /** The panel's thread has already been checked; the host reveals only it. */
+  readonly onReveal?: (messageId: string, query: string) => void;
   readonly onClose: (reason: PluginViewCloseReason) => void;
 }) {
   const { port } = options;
@@ -133,9 +138,12 @@ export const runPluginViewMount = Effect.fnUntraced(function* <E, R>(options: {
       pluginId: options.view.pluginId,
       viewId: options.view.viewId,
       title: options.view.title,
+      ...(options.threadId === undefined ? {} : { threadId: options.threadId }),
+      ...(options.environmentId === undefined ? {} : { environmentId: options.environmentId }),
     },
     port: { post: (text) => port.postMessage(text), close: () => port.close() },
     call: options.call,
+    ...(options.onReveal === undefined ? {} : { onReveal: options.onReveal }),
     onClose: options.onClose,
   });
   port.addEventListener("message", (event) => bridge.receive(event.data, event.ports.length));

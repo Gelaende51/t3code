@@ -1,0 +1,36 @@
+{
+  "id": "example.goal",
+  "name": "Goal command",
+  "version": "1.1.0",
+  "description": "Captures a per-thread goal, keeps it in front of the agent, and can gate work that leaves the thread's directory.",
+  "apiVersion": 1,
+  "entry": "main.mjs",
+  "proposedApi": true,
+  "capabilities": ["actions", "status", "settings", "transforms", "approvals"],
+  "actions": [
+    {
+      "name": "goal",
+      "title": "Set or clear the thread goal",
+      "description": "Arms the thread: the next message becomes its goal. Run it again to clear the goal.",
+      "target": "thread",
+      "placements": ["composer-slash", "command-palette", "thread-menu"]
+    }
+  ],
+  "settings": [
+    {
+      "type": "boolean",
+      "key": "confineWrites",
+      "label": "Confine file changes",
+      "default": true,
+      "description": "While a goal is active, deny file changes outside the thread's working directory when the provider asks for approval."
+    },
+    {
+      "type": "text",
+      "key": "allowedCommands",
+      "label": "Allowed command prefixes",
+      "description": "One prefix per line. While a goal is active, deny commands that match none of them when the provider asks for approval. Empty lets commands through. Prefixes are blunt: allowing `git` also allows `git push --force`."
+    }
+  ],
+  "transforms": { "enrich": { "timeoutSeconds": 5 } },
+  "approvals": { "kinds": ["command", "file-change"], "timeoutSeconds": 10 }
+}

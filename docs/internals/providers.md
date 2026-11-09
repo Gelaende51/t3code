@@ -29,9 +29,11 @@ configuration changes. OpenCode stores "always" approval grants for the whole pr
 full-access replies use `once` so they cannot widen a supervised thread's permissions on a shared
 server. On 2.x, a session-wide approval also replies `once` and becomes T3's own rule on that session.
 
-Pi runs the user's own `pi` install in RPC mode and owns native extension, package, and project
-trust discovery. T3 injects only its namespaced MCP bridge, so a Pi session behaves as it does in
-the Pi TUI. Pi session files back native resume, rollback, and same-instance thread forks.
+Pi runs the user's own `pi` install in RPC mode and owns native extension, package, and session
+discovery. RPC has no trust prompt, so T3 passes `--approve` or `--no-approve` from the instance's
+**Trust project files** setting; an explicit flag in launch arguments wins. T3 injects only its
+namespaced MCP bridge, so a trusted session behaves as it does in the Pi TUI. Pi session files back
+native resume, rollback, and same-instance thread forks.
 Forks use Pi's CLI in the destination directory because RPC session switching retains the source
 session's cwd. Provider switches still use portable handoff summaries.
 See the [adapter](../../packages/provider-pi/src/server/adapter.ts).

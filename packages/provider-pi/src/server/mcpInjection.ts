@@ -78,6 +78,12 @@ const PI_ARGUMENTS_WITHOUT_VALUES = new Set([
   "--verbose",
 ]);
 
+const PI_PROJECT_TRUST_ARGUMENTS = new Set(["--approve", "-a", "--no-approve", "-na"]);
+
+function hasExplicitProjectTrustArgument(args: ReadonlyArray<string>): boolean {
+  return args.some((arg) => PI_PROJECT_TRUST_ARGUMENTS.has(arg));
+}
+
 export type PiLaunchArgsResolution =
   | { readonly ok: true; readonly args: ReadonlyArray<string> }
   | { readonly ok: false; readonly message: string };
@@ -247,6 +253,8 @@ export function buildPiRpcLaunch(input: {
   readonly disableExtensions?: boolean;
   readonly disableTools?: boolean;
   readonly runtimeMode?: "approval-required" | "auto-accept-edits" | "auto" | "full-access";
+  /** Adds --approve or --no-approve. An explicit trust flag in launchArgs wins. */
+  readonly trustProjectResources?: boolean;
 }): {
   readonly args: ReadonlyArray<string>;
   readonly env: NodeJS.ProcessEnv;
@@ -259,6 +267,10 @@ export function buildPiRpcLaunch(input: {
       : input.launchArgs;
   const launchArgs =
     input.disableTools === true ? withoutToolSelectionArgs(extensionSafeArgs) : extensionSafeArgs;
+  const projectTrustArgs =
+    input.trustProjectResources === undefined || hasExplicitProjectTrustArgument(input.launchArgs)
+      ? []
+      : [input.trustProjectResources ? "--approve" : "--no-approve"];
   const args = [
     "--mode",
     "rpc",
@@ -267,6 +279,7 @@ export function buildPiRpcLaunch(input: {
       : input.sessionPath !== undefined
         ? ["--session", input.sessionPath]
         : []),
+    ...projectTrustArgs,
     ...launchArgs,
     // Restrictions must follow launch args so user flags cannot re-enable unattended tools/extensions.
     ...(input.disableExtensions === true ? ["--no-extensions"] : []),

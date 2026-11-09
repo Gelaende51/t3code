@@ -84,6 +84,9 @@ describe("PluginViewMessage", () => {
     expect(decodeMessage({ _tag: "call", id: 1, handler: "stats", input: { a: [1] } })).toEqual(
       Exit.succeed({ _tag: "call", id: 1, handler: "stats", input: { a: [1] } }),
     );
+    expect(decodeMessage({ _tag: "reveal", messageId: "message-1", query: "Heading" })).toEqual(
+      Exit.succeed({ _tag: "reveal", messageId: "message-1", query: "Heading" }),
+    );
     for (const invalid of [
       { _tag: "call", id: 0, handler: "stats", input: null },
       { _tag: "call", id: 1, handler: "view:other:stats", input: null },

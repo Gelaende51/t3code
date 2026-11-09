@@ -11,6 +11,11 @@ A plugin is a directory with a [`t3-plugin.json`](../../packages/contracts/src/p
 - Contributions are declared statically in the manifest (tools, actions, settings, views, transforms), never registered at `activate`. That keeps them under consent, lets every client show them without a running plugin, and keeps the rule that zero enabled or zero used plugins means zero processes. Listing, rendering and configuring never start a plugin; only a call does. A new contribution kind follows the same shape: a manifest field validated by [PluginManifestLoader.ts](../../apps/server/src/plugins/PluginManifestLoader.ts) and a forward-compatible field on the catalogue summary.
 - A server refuses a plugin that declares a capability it does not implement, so an older server never runs a plugin without a feature it needs. A new plugin requirement is a new capability name, not a `PLUGIN_API_VERSION` bump. Consumers also check that `consent.capabilities` includes their capability.
 
+## Development auto-consent
+
+- `T3CODE_PLUGIN_DEV_AUTO_CONSENT` names comma- or newline-separated absolute plugin directories. On a local server, a change under one of them is consented to and registered under a new generation automatically, and a missing installation is added again. It is off by default; it bypasses the review step entirely and must never be set on a shared or untrusted machine.
+- The watcher belongs to the local server process. It does not change the trust model for other servers, and it does not make plugin code sandboxed.
+
 ## Gating
 
 - Every plugin request a client sends is gated on the capability flag of the session it is sent on (`plugins`, `pluginSettings`, `pluginActions`, `pluginViews`, `pluginNotifications`, `pluginNpm`). Check it on that session's own config at send time, as [`requestIfSupported`](../../packages/client-runtime/src/rpc/client.ts) does. A cached config or a capability seen before a reconnect to an older server is not enough, and a missing flag means send nothing.

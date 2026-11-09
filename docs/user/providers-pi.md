@@ -47,10 +47,13 @@ reporting while a response streams and after it settles.
 Pi skills appear in the composer's `$` menu. This includes user skills and project skills that Pi
 loads for the current workspace; selecting one uses Pi's native skill expansion.
 
-Pi loads its normal user extensions, and project extensions once the folder is trusted in Pi.
-Blocking `select`, `confirm`, `input`, and `editor` dialogs work in T3 Code. Notifications appear in
-the work log. On web and desktop, extension statuses (`setStatus`) appear beside the thread title; on mobile,
-they appear under the thread header.
+Pi loads project settings, extensions, skills, prompts, MCP servers, and system prompt files for the
+thread's workspace. RPC has no trust prompt, so T3 Code passes `--approve` to Pi. Turn off
+**Trust project files** in the Pi instance settings, or pass `--no-approve` in launch arguments, to
+keep project resources off. An explicit `--approve` or `--no-approve` launch argument wins over the
+setting. Blocking `select`, `confirm`, `input`, and `editor` dialogs work in T3 Code. Notifications
+appear in the work log. On web and desktop, extension statuses (`setStatus`) appear beside the
+thread title; on mobile, they appear under the thread header.
 They can lag a session change until the extension updates them. Pi terminal titles and widgets
 do not have a T3 Code equivalent.
 
@@ -82,12 +85,11 @@ threads.
 - If no models appear, open Pi directly and confirm its authentication and model configuration.
 - If discovery cannot complete, T3 Code keeps Pi available with the `Pi default` model. Start a
   thread to let the interactive Pi session handle any startup prompt.
-- If Pi skips project settings, extensions, skills, prompts, MCP servers, or system prompt files
-  because the folder is not trusted, the thread shows a notice on the first turn of the Pi session.
-  Run the configured Pi binary in that folder on the server machine, using the same provider
-  environment, including `PI_CODING_AGENT_DIR` if set. Trust the folder or its parent with `/trust`,
-  then start a new thread using that same worktree. Launch arguments with `--no-approve` keep
-  project files off without the notice.
+- If Pi skips project settings, extensions, skills, prompts, MCP servers, or system prompt files,
+  check that **Trust project files** is on for the Pi instance. T3 Code passes `--no-approve` when
+  the setting is off; an explicit `--approve` or `--no-approve` in launch arguments wins. Turning
+  the setting back on affects the next Pi session, so start a new thread or switch the thread's
+  provider session to reload project resources.
 - The context meter is off by default; see [commands and skills](./composer.md#commands-and-skills)
   to enable it on web and desktop. It appears once Pi reports usage for the thread. Some model
   providers only report usage when a response completes, so the meter can wait for the first reply.

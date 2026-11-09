@@ -31,6 +31,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as PubSub from "effect/PubSub";
+import * as Queue from "effect/Queue";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
 import * as Stream from "effect/Stream";
@@ -44,6 +45,25 @@ import {
   type PluginSourceLimits,
 } from "./pluginSource.ts";
 import { PluginSupervisor, type PluginInvokeError } from "./PluginSupervisor.ts";
+
+/**
+ * Development-only opt-in: directories whose changed bytes are consented to
+ * automatically. Off unless T3CODE_PLUGIN_DEV_AUTO_CONSENT names them. This
+ * bypasses the review step on the local server, so never set it on a shared
+ * or untrusted machine.
+ */
+const normalizePluginDirectory = (value: string) => value.trim().replace(/[\\/]+$/, "");
+
+const devAutoConsentDirectories = () =>
+  (process.env.T3CODE_PLUGIN_DEV_AUTO_CONSENT ?? "")
+    .split(/[,\n]/)
+    .map(normalizePluginDirectory)
+    .filter((directory) => directory.length > 0);
+
+const devAutoConsent = (directory: string) => {
+  const normalized = normalizePluginDirectory(directory);
+  return devAutoConsentDirectories().some((candidate) => candidate === normalized);
+};
 
 /** What is persisted: the wire record without the live process and delivery states. */
 const PluginInstallationRecord = PluginInstallation.mapFields(
@@ -354,7 +374,25 @@ export const make = Effect.fn("PluginCatalog.make")(function* (
       return inspection;
     }
     const record: PluginInstallationRecord = { ...current, ...found, inspectedAt: yield* now };
-    if (record.enabled && !isReady(record)) {
+    if (
+      devAutoConsent(record.directory) &&
+      inspection._tag === "ok" &&
+      (!record.enabled || !isReady(record))
+    ) {
+      const consent = {
+        digest: inspection.source.digest,
+        capabilities: inspection.registration.manifest.capabilities,
+        grantedAt: yield* now,
+      };
+      yield* Effect.logWarning("Development auto-consent: approving plugin source", {
+        installationId: record.installationId,
+        directory: record.directory,
+        previousDigest: current.source?.digest ?? null,
+        digest: consent.digest,
+      });
+      yield* revoke(installation, { ...record, consent, enabled: false });
+      yield* register(installation, inspection.registration);
+    } else if (record.enabled && !isReady(record)) {
       yield* Effect.logWarning("Plugin source changed; disabling until consent is renewed", {
         installationId: record.installationId,
         directory: record.directory,
@@ -883,11 +921,16 @@ export const make = Effect.fn("PluginCatalog.make")(function* (
   // returns, so no management step can act on an installation still waiting to be restored.
   yield* managed(
     Effect.forEach(
-      [...installations.values()].filter((installation) => installation.record.enabled),
+      [...installations.values()].filter(
+        (installation) =>
+          installation.record.enabled || devAutoConsent(installation.record.directory),
+      ),
       (installation) =>
         reinspect(installation).pipe(
           Effect.flatMap((inspection) =>
-            inspection._tag === "ok" && installation.record.enabled
+            inspection._tag === "ok" &&
+            installation.record.enabled &&
+            installation.registered === undefined
               ? register(installation, inspection.registration)
               : Effect.void,
           ),
@@ -904,6 +947,69 @@ export const make = Effect.fn("PluginCatalog.make")(function* (
     Effect.ensuring(Deferred.succeed(restored, undefined)),
     Effect.forkIn(scope, { startImmediately: true }),
   );
+
+  // Development-only: watch allowlisted install directories (and create the
+  // installation if it is missing) so a sync is consented and restarted
+  // without a manual review. Disabled unless the environment names them.
+  const devDirectories = devAutoConsentDirectories();
+  if (devDirectories.length > 0) {
+    const changes = yield* Queue.unbounded<string>();
+    const ensureDevInstallation = Effect.fnUntraced(function* (directory: string) {
+      let installation = [...installations.values()].find(
+        (candidate) => normalizePluginDirectory(candidate.record.directory) === directory,
+      );
+      if (installation === undefined) {
+        const added = yield* add({ directory }).pipe(
+          Effect.catch((error) =>
+            Effect.logWarning("Could not auto-install a development plugin", {
+              directory,
+              detail: error.message,
+            }).pipe(Effect.as(null)),
+          ),
+        );
+        if (added === null) return;
+        installation = installations.get(added.installation.installationId);
+      }
+      if (installation === undefined) return;
+      yield* refresh({ installationId: installation.record.installationId }).pipe(
+        Effect.catch((error) =>
+          Effect.logWarning("Could not auto-consent a development plugin", {
+            directory,
+            detail: error.message,
+          }),
+        ),
+      );
+    });
+    yield* Effect.forEach(
+      devDirectories,
+      (directory) =>
+        fileSystem.watch(directory, { recursive: true }).pipe(
+          Stream.runForEach(() => Queue.offer(changes, directory).pipe(Effect.asVoid)),
+          Effect.catch((error) =>
+            Effect.logWarning("Could not watch a development plugin directory", {
+              directory,
+              detail: String(error),
+            }),
+          ),
+          Effect.forkIn(scope),
+        ),
+      { discard: true },
+    );
+    yield* Stream.fromQueue(changes).pipe(
+      Stream.debounce("500 millis"),
+      Stream.runForEach(ensureDevInstallation),
+      Effect.forkIn(scope),
+    );
+    yield* Deferred.await(restored).pipe(
+      Effect.andThen(
+        Effect.forEach(devDirectories, ensureDevInstallation, {
+          concurrency: "unbounded",
+          discard: true,
+        }),
+      ),
+      Effect.forkIn(scope),
+    );
+  }
 
   return PluginCatalog.of({
     list,

@@ -1,0 +1,17 @@
+{
+  "name": "t3-plugin-goal-command",
+  "version": "1.1.0",
+  "description": "A per-thread /goal addon for T3 Code: captures a goal, keeps it in context, and gates out-of-scope approvals.",
+  "keywords": [
+    "goal",
+    "t3-code",
+    "t3-plugin"
+  ],
+  "license": "MIT",
+  "files": [
+    "t3-plugin.json",
+    "main.mjs"
+  ],
+  "type": "module",
+  "main": "main.mjs"
+}

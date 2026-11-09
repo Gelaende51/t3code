@@ -177,11 +177,27 @@ export const PluginViewMessage = Schema.TaggedUnion({
   /** Abandons call `id`; the host answers it `cancelled` unless it already answered. */
   cancel: { id: BridgeId },
   pong: { n: NonNegativeInt },
+  /**
+   * A one-way request to bring a message of the mounted thread into view.
+   * `query` starts the host's find at `messageId`, so it should be text from
+   * that message. The host ignores a reveal for a thread it does not show.
+   */
+  reveal: {
+    messageId: Schema.String.check(Schema.isMaxLength(4096)),
+    query: Schema.String.check(Schema.isMaxLength(512)),
+  },
 });
 
 /** From the host to the view. The first message on a port is always `init`. */
 export const PluginViewHostMessage = Schema.TaggedUnion({
-  init: { pluginId: Schema.String, viewId: Schema.String, title: Schema.String },
+  init: {
+    pluginId: Schema.String,
+    viewId: Schema.String,
+    title: Schema.String,
+    /** The thread whose panel mounts the view; absent on hosts before reveal support. */
+    threadId: Schema.optionalKey(Schema.String),
+    environmentId: Schema.optionalKey(Schema.String),
+  },
   result: { id: BridgeId, value: Schema.Json },
   /**
    * `code` is an open set: a `PluginViewError` reason, `cancelled`, `busy`,

@@ -193,19 +193,27 @@ const startMount = Effect.fn("startMount")(function* (
   const closed = yield* Deferred.make<string>();
   const closes: string[] = [];
   const calls: Array<{ handler: string; input: Schema.Json }> = [];
+  const reveals: Array<{ messageId: string; query: string }> = [];
+  const revealed = yield* Deferred.make<void>();
   const fiber = yield* runPluginViewMount({
     port: channel.port1,
     view: board,
+    threadId: "thread-1",
+    environmentId: "environment-1",
     call: (handler, input) => {
       calls.push({ handler, input });
       return answer(handler, input);
+    },
+    onReveal: (messageId, query) => {
+      reveals.push({ messageId, query });
+      Deferred.doneUnsafe(revealed, Effect.void);
     },
     onClose: (reason) => {
       closes.push(reason);
       Deferred.doneUnsafe(closed, Effect.succeed(reason));
     },
   }).pipe(Effect.scoped, Effect.forkChild);
-  return { view, received, receivedCount, closed, closes, calls, fiber };
+  return { view, received, receivedCount, closed, closes, calls, reveals, revealed, fiber };
 });
 
 describe("runPluginViewMount", () => {
@@ -218,6 +226,8 @@ describe("runPluginViewMount", () => {
         pluginId: board.pluginId,
         viewId: board.viewId,
         title: board.title,
+        threadId: "thread-1",
+        environmentId: "environment-1",
       });
       mount.view.postMessage(
         stringify({ _tag: "call", id: 1, handler: "echo", input: { from: "board" } }),
@@ -232,6 +242,25 @@ describe("runPluginViewMount", () => {
       });
       yield* Fiber.interrupt(mount.fiber);
       expect(mount.closes).toEqual(["closed"]);
+      mount.view.close();
+    }),
+  );
+
+  it.effect("passes a reveal to the host without posting an answer", () =>
+    Effect.gen(function* () {
+      const mount = yield* startMount();
+      yield* mount.receivedCount(1);
+      mount.view.postMessage(
+        stringify({
+          _tag: "reveal",
+          messageId: "message-1",
+          query: "  Frontier models  ",
+        }),
+        [],
+      );
+      yield* Deferred.await(mount.revealed);
+      expect(mount.reveals).toEqual([{ messageId: "message-1", query: "Frontier models" }]);
+      yield* Fiber.interrupt(mount.fiber);
       mount.view.close();
     }),
   );

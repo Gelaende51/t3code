@@ -86,6 +86,23 @@ describe("pi T3 MCP injection", () => {
     );
   });
 
+  it("passes the project trust decision and keeps an explicit launch flag", () => {
+    const argsFor = (trustProjectResources: boolean | undefined, launchArgs: string[]) =>
+      buildPiRpcLaunch({
+        launchArgs,
+        environment: {},
+        mcpSession: undefined,
+        extensionPath: undefined,
+        ...(trustProjectResources === undefined ? {} : { trustProjectResources }),
+      }).args;
+
+    assert.deepEqual(argsFor(true, []), ["--mode", "rpc", "--approve"]);
+    assert.deepEqual(argsFor(false, []), ["--mode", "rpc", "--no-approve"]);
+    assert.deepEqual(argsFor(undefined, []), ["--mode", "rpc"]);
+    assert.deepEqual(argsFor(true, ["--no-approve"]), ["--mode", "rpc", "--no-approve"]);
+    assert.deepEqual(argsFor(false, ["--approve"]), ["--mode", "rpc", "--approve"]);
+  });
+
   it("forces tools and user extensions off for unattended text generation", () => {
     const launch = buildPiRpcLaunch({
       launchArgs: [

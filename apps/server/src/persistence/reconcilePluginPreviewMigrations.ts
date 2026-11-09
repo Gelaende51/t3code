@@ -12,6 +12,9 @@ import Migration73 from "./Migrations/073_ActiveTurnItemIndexes.ts";
 import Migration74 from "./Migrations/074_ExcludeAttachmentPlaceholdersFromSearch.ts";
 import Migration75 from "./Migrations/075_SubagentDeliveryState.ts";
 import Migration76 from "./Migrations/076_ProjectionProjectsPinArchive.ts";
+import Migration77 from "./Migrations/077_RepairBooleanSettledOverride.ts";
+import Migration78 from "./Migrations/078_DropOrchestrationEventCorrelationIndex.ts";
+import Migration79 from "./Migrations/079_DelegatedRecoveryIndexes.ts";
 
 // These unmerged preview builds used main's next slots. Recognize their exact
 // histories and schemas; never reinterpret an unknown build's migration ledger.
@@ -55,6 +58,9 @@ const upstream = [
   [74, "ExcludeAttachmentPlaceholdersFromSearch", Migration74],
   [75, "SubagentDeliveryState", Migration75],
   [76, "ProjectionProjectsPinArchive", Migration76],
+  [77, "RepairBooleanSettledOverride", Migration77],
+  [78, "DropOrchestrationEventCorrelationIndex", Migration78],
+  [79, "DelegatedRecoveryIndexes", Migration79],
 ] as const;
 const normalize = (sql: string) => sql.trim().replace(/\s+/g, " ").toLowerCase();
 const badState = () =>

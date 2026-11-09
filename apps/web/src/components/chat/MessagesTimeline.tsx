@@ -89,6 +89,7 @@ import {
 } from "./MessagesTimeline.logic";
 import { type ThreadFindMatch } from "./threadFind";
 import { useThreadFindNavigation } from "./useThreadFindNavigation";
+import { useThreadRevealNavigation } from "./useThreadRevealNavigation";
 import { TooltipScrollDismissArea } from "../ui/tooltip";
 import { WorktreeSetupCard } from "./WorktreeSetupCard";
 import { useOpenPrLink } from "~/lib/openPullRequestLink";
@@ -1207,6 +1208,16 @@ const ConversationTimeline = memo(function ConversationTimeline({
     rowIndex: activeFindMatch ? rows.findIndex((row) => row.id === activeFindMatch.entryId) : -1,
     listRef,
     contentInsetEndAdjustment,
+  });
+
+  useThreadRevealNavigation({
+    threadKey: listIdentityKey,
+    container: timelineViewportElement,
+    rows,
+    listRef,
+    listReady: findListReady && !restoringThreadPosition,
+    navigate: navigateTimeline,
+    historyControls,
   });
 
   // LegendList moves rows one commit late; per-row providers prevent thread context leaks.

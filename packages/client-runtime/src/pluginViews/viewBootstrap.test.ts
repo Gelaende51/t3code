@@ -21,6 +21,7 @@ interface ViewApi {
     input?: unknown,
     options?: { readonly signal?: AbortSignal },
   ) => Promise<unknown>;
+  readonly reveal: (messageId: unknown, query: unknown) => Promise<void>;
 }
 
 const parse = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown));
@@ -147,6 +148,21 @@ const countedAbortSignal = () => {
 };
 
 describe("plugin view bootstrap with the host bridge", () => {
+  it.effect("exposes reveal after the handshake", () =>
+    Effect.gen(function* () {
+      const { t3View } = yield* mountBootstrap();
+      expect(typeof t3View.reveal).toBe("function");
+      yield* Effect.promise(() => t3View.reveal("message-1", "Heading"));
+      const refused = yield* Effect.promise(() =>
+        t3View.reveal(7, "Heading").then(
+          () => null,
+          (error: { readonly code?: unknown }) => error,
+        ),
+      );
+      expect(refused?.code).toBe("invalid");
+    }),
+  );
+
   it.effect("settles a call burst past the rate budget, refusing only the excess", () =>
     Effect.gen(function* () {
       const gate = yield* Deferred.make<void>();

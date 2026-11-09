@@ -1,4 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
+import { scopedThreadKey } from "@t3tools/client-runtime/environment";
 import { EnvironmentRegistry } from "@t3tools/client-runtime/connection";
 import type { PluginViewCloseReason } from "@t3tools/client-runtime/plugin-views/bridge";
 import {
@@ -6,7 +7,7 @@ import {
   PLUGIN_VIEW_FRAME_ATTRIBUTES,
 } from "@t3tools/client-runtime/plugin-views/document";
 import { callPluginView } from "@t3tools/client-runtime/state/pluginViews";
-import type { EnvironmentId, PluginView } from "@t3tools/contracts";
+import type { EnvironmentId, PluginView, ScopedThreadRef } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Result from "effect/Result";
@@ -22,6 +23,8 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "~/components/ui/empty";
+import { closeThreadFind } from "~/components/chat/threadFindStore";
+import { revealThreadMessage } from "~/components/chat/threadRevealStore";
 import { connectionAtomRuntime } from "~/connection/runtime";
 import type { PluginViewSurface } from "~/rightPanelStore";
 import { pluginViewEnvironment, usePluginViews } from "~/state/pluginViews";
@@ -107,11 +110,22 @@ export default function PluginViewSidePanel(props: { readonly surface: PluginVie
         />
       );
     case "mount":
-      return <PluginViewMount key={target.key} environmentId={environmentId} view={target.view} />;
+      return (
+        <PluginViewMount
+          key={target.key}
+          environmentId={environmentId}
+          view={target.view}
+          threadRef={threadRef}
+        />
+      );
   }
 }
 
-function PluginViewMount(props: { environmentId: EnvironmentId; view: PluginView }) {
+function PluginViewMount(props: {
+  environmentId: EnvironmentId;
+  view: PluginView;
+  threadRef: ScopedThreadRef;
+}) {
   // The key fixes installation, generation and view, and a generation's manifest never changes.
   const [view] = useState(props.view);
   const { environmentId } = props;
@@ -165,6 +179,7 @@ function PluginViewMount(props: { environmentId: EnvironmentId; view: PluginView
       key={attempt}
       environmentId={environmentId}
       view={view}
+      threadRef={props.threadRef}
       document={document.success}
       onEnd={setEnded}
     />
@@ -174,10 +189,11 @@ function PluginViewMount(props: { environmentId: EnvironmentId; view: PluginView
 function PluginViewFrame(props: {
   environmentId: EnvironmentId;
   view: PluginView;
+  threadRef: ScopedThreadRef;
   document: string;
   onEnd: (end: MountEnd) => void;
 }) {
-  const { environmentId, view, document } = props;
+  const { environmentId, view, threadRef, document } = props;
   const containerRef = useRef<HTMLDivElement>(null);
   const runtime = useAtomValue(connectionAtomRuntime);
   const services = AsyncResult.isSuccess(runtime) ? runtime.value : null;
@@ -235,7 +251,13 @@ function PluginViewFrame(props: {
             runPluginViewMount({
               port,
               view,
+              threadId: threadRef.threadId,
+              environmentId: threadRef.environmentId,
               call,
+              onReveal: (messageId, query) => {
+                closeThreadFind();
+                revealThreadMessage(scopedThreadKey(threadRef), messageId, query);
+              },
               onClose: (reason) => {
                 if (reason !== "closed") end(reason);
               },
@@ -259,7 +281,7 @@ function PluginViewFrame(props: {
       if (mount !== null) Effect.runFork(Fiber.interrupt(mount));
       frame.remove();
     };
-  }, [environmentId, view, document, services]);
+  }, [environmentId, view, threadRef, document, services]);
 
   return <div ref={containerRef} className="min-h-0 flex-1" />;
 }

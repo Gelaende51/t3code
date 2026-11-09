@@ -25,7 +25,8 @@ A plugin with the `views` capability ships UI as views: one script, and optional
 
 ## Bridge
 
-- The bridge is one MessagePort per mount, carrying JSON text messages only.
+- The bridge is one MessagePort per mount, carrying JSON text messages only. `init` carries the view ids and, when known, the thread and environment whose panel owns the mount.
+- A view's `reveal` is one-way and names a message plus a query. The host accepts it only for the mounted thread, scrolls its timeline there, and plays a one-shot flash; no host page data crosses the bridge.
 - Authority comes from the host's binding of the port (environment, installation, generation, view), never from message fields. A view's call reaches only its plugin's `view:<viewId>:<handler>` handlers, with `orchestration:operate`.
 - Bounds, budgets, liveness, and cancellation on close are enforced in [viewBridge.ts](../../packages/client-runtime/src/pluginViews/viewBridge.ts).
 - An iframe is not a process or CPU boundary: a view stuck in a loop can stall the client that hosts it.
