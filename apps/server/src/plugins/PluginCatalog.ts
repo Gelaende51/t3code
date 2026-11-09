@@ -362,18 +362,9 @@ export const make = Effect.fn("PluginCatalog.make")(function* (
             problem: null,
           }
         : { manifest: current.manifest, source: null, problem: inspection.reason };
-    // The same result keeps the record as it was, `inspectedAt` included.
-    if (
-      Equal.equals(found, {
-        manifest: current.manifest,
-        source: current.source,
-        problem: current.problem,
-      })
-    ) {
-      if (installation.unsaved) yield* commit(installation, current);
-      return inspection;
-    }
     const record: PluginInstallationRecord = { ...current, ...found, inspectedAt: yield* now };
+    // Check auto-consent before the unchanged fast path: a newly added plugin
+    // already has the right manifest/source but still needs consent.
     if (
       devAutoConsent(record.directory) &&
       inspection._tag === "ok" &&
@@ -392,6 +383,16 @@ export const make = Effect.fn("PluginCatalog.make")(function* (
       });
       yield* revoke(installation, { ...record, consent, enabled: false });
       yield* register(installation, inspection.registration);
+    } else if (
+      Equal.equals(found, {
+        manifest: current.manifest,
+        source: current.source,
+        problem: current.problem,
+      })
+    ) {
+      // The same result keeps the record as it was, `inspectedAt` included.
+      if (installation.unsaved) yield* commit(installation, current);
+      return inspection;
     } else if (record.enabled && !isReady(record)) {
       yield* Effect.logWarning("Plugin source changed; disabling until consent is renewed", {
         installationId: record.installationId,
