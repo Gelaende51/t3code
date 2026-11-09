@@ -15,6 +15,7 @@ import Migration76 from "./Migrations/076_ProjectionProjectsPinArchive.ts";
 import Migration77 from "./Migrations/077_RepairBooleanSettledOverride.ts";
 import Migration78 from "./Migrations/078_DropOrchestrationEventCorrelationIndex.ts";
 import Migration79 from "./Migrations/079_DelegatedRecoveryIndexes.ts";
+import Migration80 from "./Migrations/080_ScheduledTaskThreadMode.ts";
 
 // These unmerged preview builds used main's next slots. Recognize their exact
 // histories and schemas; never reinterpret an unknown build's migration ledger.
@@ -61,6 +62,7 @@ const upstream = [
   [77, "RepairBooleanSettledOverride", Migration77],
   [78, "DropOrchestrationEventCorrelationIndex", Migration78],
   [79, "DelegatedRecoveryIndexes", Migration79],
+  [80, "ScheduledTaskThreadMode", Migration80],
 ] as const;
 const normalize = (sql: string) => sql.trim().replace(/\s+/g, " ").toLowerCase();
 const badState = () =>
@@ -81,7 +83,7 @@ export const reconcilePluginPreviewMigrations = Effect.fn("reconcilePluginPrevie
         SELECT migration_id, name FROM effect_sql_migrations ORDER BY migration_id
       `;
         const preview = history.find(
-          (row) => row.name === legacyNames[0] && [67, 69, 76].includes(row.migration_id),
+          (row) => row.name === legacyNames[0] && [67, 69, 76, 80].includes(row.migration_id),
         );
         if (!preview) return [];
         const start = preview.migration_id;
@@ -150,7 +152,10 @@ export const reconcilePluginPreviewMigrations = Effect.fn("reconcilePluginPrevie
         const projectColumns = yield* sql<{
           readonly name: string;
         }>`PRAGMA table_info(projection_projects)`;
-        if (projectColumns.some((row) => row.name === "pinned_at" || row.name === "archived_at"))
+        if (
+          start < 76 &&
+          projectColumns.some((row) => row.name === "pinned_at" || row.name === "archived_at")
+        )
           return yield* badState();
         const taskColumns = yield* sql<{
           readonly name: string;

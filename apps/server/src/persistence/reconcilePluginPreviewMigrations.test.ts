@@ -6,9 +6,9 @@ import * as Migrator from "effect/sql/Migrator";
 import * as SqlClient from "effect/sql/SqlClient";
 
 import { migrationManifest, runMigrations } from "./Migrations.ts";
-import PluginInstallations from "./Migrations/080_PluginInstallations.ts";
-import PluginEventCursors from "./Migrations/081_PluginEventCursors.ts";
-import PluginSettings from "./Migrations/082_PluginSettings.ts";
+import PluginInstallations from "./Migrations/081_PluginInstallations.ts";
+import PluginEventCursors from "./Migrations/082_PluginEventCursors.ts";
+import PluginSettings from "./Migrations/083_PluginSettings.ts";
 
 const previews = [
   [67, "PluginInstallations", PluginInstallations],
@@ -104,6 +104,7 @@ describe("plugin preview upgrade", () => {
     [76, 76],
     [77, 76],
     [78, 76],
+    [82, 80],
   ] as const)("preserves preview %s data and timestamps and is reentrant", ([through, start]) =>
     memory(
       Effect.gen(function* () {
@@ -120,7 +121,7 @@ describe("plugin preview upgrade", () => {
             table,
           );
         assert.deepStrictEqual(
-          yield* sql`SELECT created_at FROM effect_sql_migrations WHERE migration_id BETWEEN 80 AND ${80 + through - start}`,
+          yield* sql`SELECT created_at FROM effect_sql_migrations WHERE migration_id BETWEEN 81 AND ${81 + through - start}`,
           Array.from({ length: through - start + 1 }, () => ({
             created_at: "2026-10-01 00:00:00",
           })),
