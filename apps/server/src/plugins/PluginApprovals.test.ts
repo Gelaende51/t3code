@@ -1125,7 +1125,7 @@ it.layer(NodeServices.layer)("PluginApprovals", (it) => {
           }),
         );
         return yield* loadPluginDirectory(directory).pipe(
-          Effect.map(() => "loaded"),
+          Effect.as("loaded"),
           Effect.catch((error) => Effect.succeed(error.reason)),
         );
       });

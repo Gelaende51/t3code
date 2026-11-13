@@ -69,7 +69,7 @@ it.layer(NodeServices.layer)("digestPluginSource", (it) => {
             Buffer.from(`${directory}/`),
             Buffer.from([0x61, 0xff, 0x2e, 0x6a, 0x73]),
           ]);
-          yield* Effect.tryPromise(() =>
+          yield* Effect.promise(() =>
             kind === "file" ? NodeFSP.writeFile(raw, "A") : NodeFSP.mkdir(raw),
           );
           const error = yield* digestPluginSource(directory).pipe(Effect.flip);

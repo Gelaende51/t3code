@@ -12,7 +12,7 @@ import {
 } from "@t3tools/contracts";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
-import * as Crypto from "effect/Crypto";
+import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -78,8 +78,7 @@ export class PluginNotifications extends Context.Service<
 /** @public */
 export const make = Effect.fn("PluginNotifications.make")(function* () {
   const supervisor = yield* PluginSupervisor.PluginSupervisor;
-  const crypto = yield* Crypto.Crypto;
-  const epoch = yield* crypto.randomUUIDv4().pipe(Effect.orDie);
+  const epoch = SecureRandom.uuidV4Unsafe();
   // Every frame is the whole set, so a slow subscriber only skips intermediate ones.
   const changes = yield* PubSub.sliding<PluginNotificationFrame>(1);
   // Orders issue, removal and each subscriber's first frame against one another.

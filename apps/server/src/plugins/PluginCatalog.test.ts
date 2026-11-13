@@ -217,6 +217,7 @@ const isProcessAlive = (pid: number) => {
 const withDatabase = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   effect.pipe(Effect.provide(SqlitePersistence.layerMemory));
 
+// @effect-diagnostics processEnvInEffect:off -- Test fixture toggles the process environment around the service.
 const withDevAutoConsent = <A, E, R>(directory: string, effect: Effect.Effect<A, E, R>) =>
   Effect.acquireUseRelease(
     Effect.sync(() => {

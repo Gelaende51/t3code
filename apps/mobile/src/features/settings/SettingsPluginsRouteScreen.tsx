@@ -45,10 +45,7 @@ import {
 } from "../../state/plugins";
 import { useEnvironmentQuery } from "../../state/query";
 import { ListActionRow as SettingsActionRow } from "../../components/ui/ListActionRow";
-import {
-  AndroidSettingsEnvironmentFilter,
-  SettingsEnvironmentFilterHeader,
-} from "./components/SettingsEnvironmentFilterHeader";
+import { useSettingsEnvironmentMenu } from "./components/SettingsEnvironmentFilterHeader";
 import { SettingsScreen } from "./components/SettingsScreen";
 import { SettingsSection } from "./components/SettingsSection";
 import { useSettingsEnvironmentFilter, type SettingsTarget } from "./settings-environment-filter";
@@ -144,32 +141,30 @@ const SCROLL_PROPS = {
 
 export function SettingsPluginsRouteScreen() {
   const insets = useSafeAreaInsets();
+  const environmentMenu = useSettingsEnvironmentMenu();
   const { availableTargets, selectedTargets } = useSettingsEnvironmentFilter();
   const targets = selectedTargets.filter(supportsPlugins);
   return (
-    <>
-      <SettingsEnvironmentFilterHeader />
-      <SettingsScreen title="Plugins" trailing={<AndroidSettingsEnvironmentFilter />}>
-        <ScrollView
-          {...SCROLL_PROPS}
-          contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 18) + 18 }}
-        >
-          {targets.length > 0 ? (
-            targets.map((target) => (
-              <EnvironmentPlugins key={target.environmentId} environment={target} />
-            ))
-          ) : (
-            <Text className="px-2 text-base text-foreground-muted">
-              {availableTargets.length === 0
-                ? "Connect an environment to see its plugins."
-                : selectedTargets.length === 0
-                  ? "Select an environment to see its plugins."
-                  : "Update T3 Code on the selected environments to see their plugins."}
-            </Text>
-          )}
-        </ScrollView>
-      </SettingsScreen>
-    </>
+    <SettingsScreen title="Plugins" menus={[environmentMenu]}>
+      <ScrollView
+        {...SCROLL_PROPS}
+        contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 18) + 18 }}
+      >
+        {targets.length > 0 ? (
+          targets.map((target) => (
+            <EnvironmentPlugins key={target.environmentId} environment={target} />
+          ))
+        ) : (
+          <Text className="px-2 text-base text-foreground-muted">
+            {availableTargets.length === 0
+              ? "Connect an environment to see its plugins."
+              : selectedTargets.length === 0
+                ? "Select an environment to see its plugins."
+                : "Update T3 Code on the selected environments to see their plugins."}
+          </Text>
+        )}
+      </ScrollView>
+    </SettingsScreen>
   );
 }
 

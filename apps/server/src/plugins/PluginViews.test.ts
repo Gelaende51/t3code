@@ -28,6 +28,11 @@ import * as PluginSupervisor from "./PluginSupervisor.ts";
 import * as PluginViews from "./PluginViews.ts";
 import * as ViewFile from "./pluginViewFile.ts";
 
+class PluginViewTestFileError extends Schema.TaggedError<PluginViewTestFileError>()(
+  "PluginViewTestFileError",
+  { cause: Schema.Defect() },
+) {}
+
 // Children run the real CLI entry, which routes `__plugin-host` to the child runtime.
 const BIN_PATH = `${import.meta.dirname}/../bin.ts`;
 /** A views plugin whose `board` view has `view:board:*` handlers; tests never write to it. */
@@ -193,12 +198,15 @@ it.layer(NodeServices.layer)("PluginViews", (it) => {
               Scope.close(scope, Exit.void),
             );
             yield* Effect.addFinalizer(() =>
-              Effect.tryPromise(async () => {
-                const writer = await NodeFSP.open(
-                  plugin.script,
-                  NodeFS.constants.O_WRONLY | NodeFS.constants.O_NONBLOCK,
-                );
-                await writer.close();
+              Effect.tryPromise({
+                try: async () => {
+                  const writer = await NodeFSP.open(
+                    plugin.script,
+                    NodeFS.constants.O_WRONLY | NodeFS.constants.O_NONBLOCK,
+                  );
+                  await writer.close();
+                },
+                catch: (cause) => new PluginViewTestFileError({ cause }),
               }).pipe(Effect.ignore),
             );
             let swapped = false;

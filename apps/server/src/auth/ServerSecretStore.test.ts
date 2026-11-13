@@ -1,8 +1,8 @@
 // @effect-diagnostics nodeBuiltinImport:off -- The child fixture proves writer liveness and crash cleanup across processes.
 import * as NodeChildProcess from "node:child_process";
+import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
-import * as Cause from "effect/Cause";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -10,10 +10,15 @@ import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
+import * as Schema from "effect/Schema";
 import * as PlatformError from "effect/PlatformError";
 
 import * as ServerConfig from "../config.ts";
 import * as ServerSecretStore from "./ServerSecretStore.ts";
+
+class ChildFixtureError extends Schema.TaggedError<ChildFixtureError>()("ChildFixtureError", {
+  cause: Schema.Defect(),
+}) {}
 
 const layerServerConfig = () =>
   ServerConfig.layerTest(process.cwd(), { prefix: "t3-secret-store-test-" });
@@ -39,7 +44,7 @@ const layerPermissionDeniedFileSystem = Layer.effect(
         ),
     } satisfies FileSystem.FileSystem;
   }),
-).pipe(Layer.provide(NodeServices.layer));
+).pipe(Layer.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)));
 
 const layerPermissionDeniedSecretStore = () =>
   ServerSecretStore.layer.pipe(
@@ -66,7 +71,7 @@ const layerRenameFailureFileSystem = Layer.effect(
         ),
     } satisfies FileSystem.FileSystem;
   }),
-).pipe(Layer.provide(NodeServices.layer));
+).pipe(Layer.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)));
 
 const layerRenameFailureSecretStore = () =>
   ServerSecretStore.layer.pipe(
@@ -95,24 +100,20 @@ const layerConcurrentReadMissFileSystem = Layer.effect(
                     yield* Deferred.succeed(readBarrier, void 0);
                   }
                   yield* Deferred.await(readBarrier);
-                  return yield* Effect.failCause(
-                    Cause.fail(
-                      PlatformError.systemError({
-                        _tag: "NotFound",
-                        module: "FileSystem",
-                        method: "readFile",
-                        pathOrDescriptor: String(path),
-                        description: "Secret file does not exist yet.",
-                      }),
-                    ),
-                  );
+                  return yield* PlatformError.systemError({
+                    _tag: "NotFound",
+                    module: "FileSystem",
+                    method: "readFile",
+                    pathOrDescriptor: String(path),
+                    description: "Secret file does not exist yet.",
+                  });
                 });
               }),
             )
           : fileSystem.readFile(path),
     } satisfies FileSystem.FileSystem;
   }),
-).pipe(Layer.provide(NodeServices.layer));
+).pipe(Layer.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)));
 
 const layerConcurrentCreateSecretStore = () =>
   ServerSecretStore.layer.pipe(
@@ -120,7 +121,7 @@ const layerConcurrentCreateSecretStore = () =>
     Layer.provideMerge(layerConcurrentReadMissFileSystem),
   );
 
-it.layer(NodeServices.layer)("ServerSecretStore.layer", (it) => {
+it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("ServerSecretStore.layer", (it) => {
   it.effect("reuses an existing secret instead of regenerating it", () =>
     Effect.gen(function* () {
       const secretStore = yield* ServerSecretStore.ServerSecretStore;
@@ -320,8 +321,8 @@ it.layer(NodeServices.layer)("ServerSecretStore.layer", (it) => {
               }),
           ),
       );
-      const temporary = yield* Effect.tryPromise(
-        () =>
+      const temporary = yield* Effect.tryPromise({
+        try: () =>
           new Promise<string>((resolve, reject) => {
             child.once("message", (message) =>
               typeof message === "string"
@@ -333,7 +334,8 @@ it.layer(NodeServices.layer)("ServerSecretStore.layer", (it) => {
               reject(new Error("Child exited before publishing its temporary")),
             );
           }),
-      );
+        catch: (cause) => new ChildFixtureError({ cause }),
+      });
       const second = yield* ServerSecretStore.make;
       yield* second.remove("foreign");
       assert.isTrue(yield* fs.exists(temporary));

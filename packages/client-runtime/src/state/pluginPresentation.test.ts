@@ -35,6 +35,11 @@ import {
 } from "./pluginPresentation.ts";
 import { deliverPluginCatalog, type PluginCatalogView } from "./plugins.ts";
 
+class AuthSessionReadError extends Schema.TaggedError<AuthSessionReadError>()(
+  "AuthSessionReadError",
+  { cause: Schema.Defect() },
+) {}
+
 /** Resolves once the atom's value satisfies `done`, without polling. */
 function settled<A>(
   registry: AtomRegistry.AtomRegistry,
@@ -294,7 +299,10 @@ describe("resolvePluginManageAccess", () => {
     const sessionState = Atom.make((get) => {
       const read = Promise.withResolvers<AuthSessionState>();
       reads.set(get(credential), read);
-      return Effect.tryPromise(() => read.promise);
+      return Effect.tryPromise({
+        try: () => read.promise,
+        catch: (cause) => new AuthSessionReadError({ cause }),
+      });
     }).pipe(Atom.swr({ staleTime: 30_000, revalidateOnMount: true }));
     const registry = AtomRegistry.make();
     const unmount = registry.mount(sessionState);

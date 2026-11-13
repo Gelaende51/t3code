@@ -37,6 +37,7 @@ interface RightPanelPullRequestProps {
 }
 
 interface RightPanelFileProps {
+  readonly projectId?: ProjectId | undefined;
   readonly projectName: string | null;
   readonly workspaceRoot: string | undefined;
   readonly availableEditors: ReadonlyArray<EditorId>;
@@ -105,6 +106,10 @@ export function RightPanelSurfaceContent(props: {
             number: surface.number,
           }}
           initialTab={surface.detailTab ?? "summary"}
+          revealUrl={surface.revealUrl}
+          onRevealSettled={(revealUrl) => {
+            useRightPanelStore.getState().settlePullRequestReveal(threadRef, surface.id, revealUrl);
+          }}
           onTabChange={(tab) => {
             useRightPanelStore.getState().setPullRequestDetailTab(threadRef, surface.id, tab);
           }}
@@ -162,6 +167,7 @@ export function RightPanelSurfaceContent(props: {
           }`}
           cwd={files.workspaceRoot ?? ""}
           projectName={files.projectName ?? ""}
+          projectId={files.projectId}
           availableEditors={files.availableEditors}
           relativePath={surface.kind === "file" ? surface.relativePath : null}
           {...(attachment ? { attachment } : {})}

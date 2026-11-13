@@ -65,7 +65,6 @@ const report = (menu: Menu, draft: string) => {
   latest.menu = menu;
   latest.draft = draft;
 };
-const onUpdateInteractionMode = vi.fn();
 const onUsageLimits = vi.fn();
 
 /** A composer: the draft lives in state and the menu edits it, as in ThreadComposer and New Task. */
@@ -89,7 +88,6 @@ function Composer(props: {
       fixture.onChangeDraftMessage(next);
       setDraft(next);
     },
-    onUpdateInteractionMode,
     onUsageLimits,
   });
   // Publish only committed callbacks to the test driver.
@@ -110,7 +108,6 @@ beforeEach(() => {
   fixture.canRunNow = true;
   fixture.runPluginAction.mockReset().mockResolvedValue(true);
   fixture.onChangeDraftMessage.mockClear();
-  onUpdateInteractionMode.mockClear();
   onUsageLimits.mockClear();
   root = createRoot(document.createElement("div"));
 });
@@ -130,7 +127,9 @@ async function openMenu(draft: string, caret: number, currentThreadId: ThreadId 
 }
 
 function offered(label: string) {
-  const item = latest.menu!.items.find((candidate) => candidate.label === label);
+  const item = latest.menu!.items.find(
+    (candidate) => candidate.type === "plugin-action" && candidate.label === label,
+  );
   if (!item) throw new Error(`Expected ${label} in the menu`);
   return item;
 }
@@ -154,8 +153,6 @@ describe("picking a plugin action from the slash menu", () => {
       action: deploy,
       target: { _tag: "thread", threadId },
     });
-    // The pick is the action itself: nothing else changes the message or the turn.
-    expect(onUpdateInteractionMode).not.toHaveBeenCalled();
     expect(onUsageLimits).not.toHaveBeenCalled();
   });
 

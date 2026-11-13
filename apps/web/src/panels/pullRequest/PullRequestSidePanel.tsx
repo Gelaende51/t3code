@@ -13,6 +13,8 @@ interface PullRequestSidePanelProps {
   reference: PullRequestRef;
   initialTab?: PullRequestDetailTab;
   onTabChange?: ((tab: PullRequestDetailTab) => void) | undefined;
+  revealUrl?: string | undefined;
+  onRevealSettled?: ((revealUrl: string) => void) | undefined;
   context: "page" | "thread";
   /** True only while this surface is the visible, active tab. */
   shortcutsEnabled: boolean;
@@ -31,6 +33,8 @@ export default function PullRequestSidePanel({
   onBack,
   initialTab = "summary",
   onTabChange,
+  revealUrl,
+  onRevealSettled,
 }: PullRequestSidePanelProps) {
   const { threadRef, composerDraftTarget } = usePanelHost();
   const serverConfig = useEnvironment(threadRef.environmentId)?.serverConfig ?? null;
@@ -62,6 +66,8 @@ export default function PullRequestSidePanel({
       composerDraftTarget={composerDraftTarget}
       initialTab={initialTab}
       onTabChange={onTabChange}
+      revealUrl={revealUrl}
+      onRevealSettled={onRevealSettled}
       onBack={onBack}
     />
   );

@@ -15,8 +15,8 @@ describe("searchSlashCommandItems", () => {
       {
         id: "slash:default",
         type: "slash-command",
-        command: "default",
-        label: "/default",
+        command: "side",
+        label: "/side",
         description: "Switch this thread back to normal build mode",
       },
       {

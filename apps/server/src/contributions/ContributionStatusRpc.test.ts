@@ -1,3 +1,4 @@
+import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
 import {
@@ -22,6 +23,7 @@ import * as PortScanner from "../preview/PortScanner.ts";
 import * as RpcAuthorization from "../auth/RpcAuthorization.ts";
 import { RPC_REQUIRED_SCOPES } from "../auth/RpcAuthorization.ts";
 import * as ProviderEventLoggers from "@t3tools/provider-core/server/ProviderEventLoggers";
+import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as ProviderOrchestrationAdapterInfrastructure from "../provider/ProviderOrchestrationAdapterInfrastructure.ts";
 import * as ContributionStatusStore from "@t3tools/provider-core/server/ContributionStatusStore";
 
@@ -187,6 +189,8 @@ describe("subscribeContributionStatus", () => {
         Layer.provide(
           Layer.mergeAll(
             NodeServices.layer,
+            NodeCrypto.layer,
+            SqlitePersistence.layerMemory,
             PortScanner.layerTest,
             Layer.succeed(
               ProviderEventLoggers.ProviderEventLoggers,
