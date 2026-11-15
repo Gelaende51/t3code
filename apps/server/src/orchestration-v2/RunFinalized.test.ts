@@ -110,13 +110,16 @@ const makeLayer = (
     Layer.provide(
       Layer.mergeAll(
         finalization,
+        stores,
         Layer.mock(ProviderSessionManager.ProviderSessionManagerV2)({}),
         Layer.mock(CheckpointRollbackService.CheckpointRollbackServiceV2)({}),
         Layer.mock(ProviderTurnControlService.ProviderTurnControlServiceV2)({}),
         Layer.mock(ProviderTurnStartService.ProviderTurnStartServiceV2)({}),
         Layer.mock(RuntimeRequestService.RuntimeRequestServiceV2)({}),
         Layer.mock(ThreadTitleRegenerationService.ThreadTitleRegenerationService)({}),
-        Layer.mock(ThreadManagementService.ThreadManagementService)({}),
+        Layer.mock(ThreadManagementService.ThreadManagementService)({
+          recoverDelegatedTask: () => Effect.void,
+        }),
         ServerSettings.layerTest(),
       ),
     ),
@@ -383,8 +386,8 @@ it.effect("recording the milestone leaves thread activity where the run left it"
     const [milestone] = finalizedEvents(events);
     assert.isDefined(completed);
     assert.isDefined(milestone);
-    // The slow refresh put the milestone a minute after the run's last write.
-    assert.isTrue(DateTime.isGreaterThan(milestone.event.occurredAt, completed.event.occurredAt));
+    // The display refresh no longer delays the milestone past the run's last write.
+    assert.isFalse(DateTime.isGreaterThan(milestone.event.occurredAt, completed.event.occurredAt));
     const shell = yield* projections.getThreadShell(threadId);
     assert.deepEqual(shell?.updatedAt, completed.event.occurredAt);
   }).pipe(
@@ -744,6 +747,15 @@ it.effect.each([
     yield* seedThread;
     yield* finishProviderTurn(testCase.turn);
     yield* drainWorker;
+    if (testCase.operation === "refresh-workspace") {
+      // The display refresh is fire-and-forget, so its defect cannot fail the capture.
+      assert.deepEqual(yield* captureStatus, Option.some("succeeded"));
+      yield* restartServer;
+      yield* drainWorker;
+      assert.equal(yield* runStatus, testCase.runAfterRestart);
+      assert.deepEqual(yield* captureStatus, Option.some("succeeded"));
+      return;
+    }
     assert.deepEqual(yield* captureStatus, Option.some("pending"));
     assert.lengthOf(yield* finalizationRecords, 0);
 

@@ -1,5 +1,6 @@
 import { OrchestratorMcpFailure, PluginToolError, PluginToolsListResult } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
+import * as McpSchema from "effect/ai/McpSchema";
 import * as Tool from "effect/ai/Tool";
 import * as Toolkit from "effect/ai/Toolkit";
 
@@ -31,7 +32,8 @@ const PluginToolsListTool = Tool.make("plugin_tools_list", {
   .annotate(Tool.Readonly, true)
   .annotate(Tool.Destructive, false)
   .annotate(Tool.Idempotent, true)
-  .annotate(Tool.OpenWorld, false);
+  .annotate(Tool.OpenWorld, false)
+  .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenFromOutsideClients);
 
 /**
  * One fixed tool calls every plugin tool, so its hints describe the most a
@@ -59,6 +61,7 @@ const PluginToolCallTool = Tool.make("plugin_tool_call", {
   .annotate(Tool.Readonly, false)
   .annotate(Tool.Destructive, true)
   .annotate(Tool.Idempotent, false)
-  .annotate(Tool.OpenWorld, true);
+  .annotate(Tool.OpenWorld, true)
+  .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenFromOutsideClients);
 
 export const PluginToolsToolkit = Toolkit.make(PluginToolsListTool, PluginToolCallTool);

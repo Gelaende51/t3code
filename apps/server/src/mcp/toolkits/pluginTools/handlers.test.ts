@@ -138,23 +138,14 @@ it.effect(
         },
       ]);
 
-      // Outside clients see no plugin tools and cannot call one; the plugin is never reached.
+      // Outside clients are not offered plugin tools and cannot call one; the plugin is never reached.
       seen.length = 0;
-      const outsideList = yield* callTool("plugin_tools_list", {}, outsideClient);
-      expect(outsideList.isError).toBe(false);
-      const outsideCall = yield* callTool(
-        "plugin_tool_call",
-        { tool: "acme.search/lookup" },
-        outsideClient,
+      const outsideList = yield* Effect.exit(callTool("plugin_tools_list", {}, outsideClient));
+      const outsideCall = yield* Effect.exit(
+        callTool("plugin_tool_call", { tool: "acme.search/lookup" }, outsideClient),
       );
-      expect(outsideCall.isError).toBe(true);
-      expect(outsideCall.content).toEqual([
-        {
-          type: "text",
-          text: "This tool acts as the calling T3 thread, so it needs an agent running inside T3 Code. This MCP client signed in from outside a thread.",
-        },
-      ]);
-      expect(outsideList.structuredContent).toEqual({ tools: [], notInThisSession: [] });
+      expect(outsideList._tag).toBe("Failure");
+      expect(outsideCall._tag).toBe("Failure");
       expect(seen).toEqual([]);
       for (const modes of [
         { runtimeMode: "approval-required", interactionMode: "default" },

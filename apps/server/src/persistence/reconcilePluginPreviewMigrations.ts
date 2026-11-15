@@ -23,6 +23,14 @@ import Migration84 from "./Migrations/084_LastExecutedRunIndex.ts";
 import Migration85 from "./Migrations/085_TurnItemCounts.ts";
 import Migration86 from "./Migrations/086_QueuedTurnInputIndex.ts";
 import Migration87 from "./Migrations/087_ProjectionProjectsCustomTitle.ts";
+import Migration88 from "./Migrations/088_TurnItemTypeStatusIndex.ts";
+import Migration89 from "./Migrations/089_ShellThreadReadIndexes.ts";
+import Migration90 from "./Migrations/090_AuthConnectDevices.ts";
+import Migration91 from "./Migrations/091_AuthConnectDeniedRequests.ts";
+import Migration92 from "./Migrations/092_QueuedTurnInputIndexJsonValid.ts";
+import Migration93 from "./Migrations/093_ProviderTurnAttemptIndex.ts";
+import Migration94 from "./Migrations/094_TurnItemMessageOrdinalIndex.ts";
+import Migration95 from "./Migrations/095_TurnItemInlineWorkOutput.ts";
 
 // These unmerged preview builds used main's next slots. Recognize their exact
 // histories and schemas; never reinterpret an unknown build's migration ledger.
@@ -77,6 +85,14 @@ const upstream = [
   [85, "TurnItemCounts", Migration85],
   [86, "QueuedTurnInputIndex", Migration86],
   [87, "ProjectionProjectsCustomTitle", Migration87],
+  [88, "TurnItemTypeStatusIndex", Migration88],
+  [89, "ShellThreadReadIndexes", Migration89],
+  [90, "AuthConnectDevices", Migration90],
+  [91, "AuthConnectDeniedRequests", Migration91],
+  [92, "QueuedTurnInputIndexJsonValid", Migration92],
+  [93, "ProviderTurnAttemptIndex", Migration93],
+  [94, "TurnItemMessageOrdinalIndex", Migration94],
+  [95, "TurnItemInlineWorkOutput", Migration95],
 ] as const;
 const normalize = (sql: string) => sql.trim().replace(/\s+/g, " ").toLowerCase();
 const badState = () =>
@@ -98,7 +114,8 @@ export const reconcilePluginPreviewMigrations = Effect.fn("reconcilePluginPrevie
       `;
         const preview = history.find(
           (row) =>
-            row.name === legacyNames[0] && [67, 69, 76, 77, 80, 81].includes(row.migration_id),
+            row.name === legacyNames[0] &&
+            [67, 69, 76, 77, 80, 81, 82, 83, 88].includes(row.migration_id),
         );
         if (!preview) return [];
         const start = preview.migration_id;

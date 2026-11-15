@@ -11,6 +11,7 @@ import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as FiberMap from "effect/FiberMap";
+import * as FiberSet from "effect/FiberSet";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
@@ -91,6 +92,7 @@ const make = Effect.gen(function* () {
   const projections = yield* ProjectionStore.ProjectionStoreV2;
   const eventSink = yield* EventSink.EventSinkV2;
   const observer = yield* RunFinalizationObserver;
+  const refreshes = yield* FiberSet.make<void>();
 
   const finalize = Effect.fn("RunFinalizationService.finalize")(function* (input: {
     readonly threadId: ThreadId;
@@ -118,7 +120,8 @@ const make = Effect.gen(function* () {
       const projection = yield* projections.getCheckpointContext(input.threadId);
       const cwd = projection.checkpointScopes.find((scope) => scope.id === input.scopeId)?.cwd;
       if (cwd !== undefined) {
-        // A display refresh failure must not retry an already durable checkpoint.
+        // The refresh only updates the display, so the thread's next turn must not wait for it.
+        // Never replaced by a newer one: back-to-back turns would interrupt each before it publishes.
         yield* observer.refresh({ cwd, threadId: input.threadId, runId: input.runId }).pipe(
           Effect.catchTags({
             RunFinalizationRefreshError: (cause) =>
@@ -127,6 +130,7 @@ const make = Effect.gen(function* () {
                 cause,
               }),
           }),
+          FiberSet.run(refreshes),
         );
       }
     }).pipe(Effect.catchCause(failStep("refresh-workspace")));

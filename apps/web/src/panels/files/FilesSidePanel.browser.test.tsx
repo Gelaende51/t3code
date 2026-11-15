@@ -63,6 +63,7 @@ vi.mock("~/state/server", async () => {
     environmentServerConfigsAtom: Atom.make(new Map()),
     primaryServerKeybindingsAtom: {},
     primaryServerEnvironmentThemesAtom: Atom.make([]),
+    themeServerEnvironmentThemesAtom: Atom.make([]),
     serverEnvironment: { configValueAtom: () => null },
   };
 });
@@ -100,6 +101,7 @@ vi.mock("~/state/environments", () => ({
   useEnvironmentHttpBaseUrl: () => "http://localhost:3773/",
   usePrimaryEnvironmentId: () => null,
   readPrimaryEnvironmentId: () => null,
+  useEnvironmentIdentities: () => [],
   useEnvironment: () => ({ label: "Local" }),
 }));
 vi.mock("~/remoteOpen", () => ({
@@ -113,6 +115,8 @@ vi.mock("~/remoteOpen", () => ({
 vi.mock("~/hooks/useSettings", () => ({
   updateClientSettings: vi.fn(),
   isClientSettingsHydrated: () => true,
+  useClientSettingsHydrated: () => true,
+  useEnvironmentSettings: () => undefined,
   ensureClientSettingsHydrated: () => Promise.resolve(),
   getClientSettings: () => DEFAULT_CLIENT_SETTINGS,
   useClientSettings: (select: (settings: typeof DEFAULT_CLIENT_SETTINGS) => unknown) =>
@@ -216,6 +220,7 @@ vi.mock("~/components/files/useDirectoryEntries", () => ({
 }));
 vi.mock("~/state/queries", () => ({
   useProjectPathSearch: () => ({ entries: [], isPending: false, refresh: () => undefined }),
+  useDebouncedValue: <A,>(value: A) => value,
 }));
 vi.mock("~/fileContextMenu", () => ({
   useFileContextMenu: () => ({ buildItems: () => [], activate: vi.fn() }),

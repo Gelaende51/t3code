@@ -88,6 +88,7 @@ function Composer(props: {
       fixture.onChangeDraftMessage(next);
       setDraft(next);
     },
+    onOpenModelPicker: vi.fn(),
     onUsageLimits,
   });
   // Publish only committed callbacks to the test driver.

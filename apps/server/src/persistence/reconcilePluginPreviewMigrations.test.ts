@@ -6,9 +6,9 @@ import * as Migrator from "effect/sql/Migrator";
 import * as SqlClient from "effect/sql/SqlClient";
 
 import { migrationManifest, runMigrations } from "./Migrations.ts";
-import PluginInstallations from "./Migrations/088_PluginInstallations.ts";
-import PluginEventCursors from "./Migrations/089_PluginEventCursors.ts";
-import PluginSettings from "./Migrations/090_PluginSettings.ts";
+import PluginInstallations from "./Migrations/096_PluginInstallations.ts";
+import PluginEventCursors from "./Migrations/097_PluginEventCursors.ts";
+import PluginSettings from "./Migrations/098_PluginSettings.ts";
 
 const previews = [
   [67, "PluginInstallations", PluginInstallations],
@@ -82,17 +82,19 @@ const memory = <A, E, R>(test: Effect.Effect<A, E, R>) =>
   test.pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" })));
 
 describe("plugin preview upgrade", () => {
-  it.effect.each([0, 68, 75, 76])("upgrades fresh/main %s with canonical migration ids", (main) =>
-    memory(
-      Effect.gen(function* () {
-        if (main) yield* runMigrations({ toMigrationInclusive: main });
-        yield* runMigrations();
-        yield* assertCurrent;
-        const before = yield* snapshot;
-        assert.deepStrictEqual(yield* runMigrations(), []);
-        assert.deepStrictEqual(yield* snapshot, before);
-      }),
-    ),
+  it.effect.each([0, 68, 75, 76, 95])(
+    "upgrades fresh/main %s with canonical migration ids",
+    (main) =>
+      memory(
+        Effect.gen(function* () {
+          if (main) yield* runMigrations({ toMigrationInclusive: main });
+          yield* runMigrations();
+          yield* assertCurrent;
+          const before = yield* snapshot;
+          assert.deepStrictEqual(yield* runMigrations(), []);
+          assert.deepStrictEqual(yield* snapshot, before);
+        }),
+      ),
   );
   it.effect.each([
     [67, 67],
@@ -107,6 +109,9 @@ describe("plugin preview upgrade", () => {
     [79, 77],
     [82, 80],
     [83, 81],
+    [84, 82],
+    [85, 83],
+    [90, 88],
   ] as const)("preserves preview %s data and timestamps and is reentrant", ([through, start]) =>
     memory(
       Effect.gen(function* () {
@@ -123,7 +128,7 @@ describe("plugin preview upgrade", () => {
             table,
           );
         assert.deepStrictEqual(
-          yield* sql`SELECT created_at FROM effect_sql_migrations WHERE migration_id BETWEEN 88 AND ${88 + through - start}`,
+          yield* sql`SELECT created_at FROM effect_sql_migrations WHERE migration_id BETWEEN 96 AND ${96 + through - start}`,
           Array.from({ length: through - start + 1 }, () => ({
             created_at: "2026-10-01 00:00:00",
           })),
