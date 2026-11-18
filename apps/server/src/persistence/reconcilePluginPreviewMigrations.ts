@@ -31,9 +31,14 @@ import Migration92 from "./Migrations/092_QueuedTurnInputIndexJsonValid.ts";
 import Migration93 from "./Migrations/093_ProviderTurnAttemptIndex.ts";
 import Migration94 from "./Migrations/094_TurnItemMessageOrdinalIndex.ts";
 import Migration95 from "./Migrations/095_TurnItemInlineWorkOutput.ts";
+import Migration96 from "./Migrations/096_RepairStaleTitleRegeneration.ts";
+import Migration97 from "./Migrations/097_IssueTrackerBindings.ts";
+import Migration98 from "./Migrations/098_ActiveShellIndexIndexes.ts";
 
 // These unmerged preview builds used main's next slots. Recognize their exact
 // histories and schemas; never reinterpret an unknown build's migration ledger.
+// 96 is the ledger this branch itself wrote before upstream filled that slot.
+const legacyStarts: ReadonlyArray<number> = [67, 69, 76, 77, 80, 81, 82, 83, 88, 96];
 const legacyNames = ["PluginInstallations", "PluginEventCursors", "PluginSettings"] as const;
 const legacySchemas = [
   [
@@ -93,6 +98,9 @@ const upstream = [
   [93, "ProviderTurnAttemptIndex", Migration93],
   [94, "TurnItemMessageOrdinalIndex", Migration94],
   [95, "TurnItemInlineWorkOutput", Migration95],
+  [96, "RepairStaleTitleRegeneration", Migration96],
+  [97, "IssueTrackerBindings", Migration97],
+  [98, "ActiveShellIndexIndexes", Migration98],
 ] as const;
 const normalize = (sql: string) => sql.trim().replace(/\s+/g, " ").toLowerCase();
 const badState = () =>
@@ -113,9 +121,7 @@ export const reconcilePluginPreviewMigrations = Effect.fn("reconcilePluginPrevie
         SELECT migration_id, name FROM effect_sql_migrations ORDER BY migration_id
       `;
         const preview = history.find(
-          (row) =>
-            row.name === legacyNames[0] &&
-            [67, 69, 76, 77, 80, 81, 82, 83, 88].includes(row.migration_id),
+          (row) => row.name === legacyNames[0] && legacyStarts.includes(row.migration_id),
         );
         if (!preview) return [];
         const start = preview.migration_id;

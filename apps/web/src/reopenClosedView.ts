@@ -56,9 +56,9 @@ export function planNextReopen(
 type PullRequestsSearchLike = Partial<PullRequestListPreferences> & {
   repository?: string;
   number?: number;
-  selectedProjectId?: ProjectId;
-  selectedHost?: string;
-  selectedEnvironmentId?: EnvironmentId;
+  selectedProjectId?: ProjectId | undefined;
+  selectedHost?: string | undefined;
+  selectedEnvironmentId?: EnvironmentId | undefined;
 };
 
 export function pullRequestsSearchForRestore<S extends PullRequestsSearchLike>(
@@ -161,6 +161,9 @@ export async function reopenClosedView(
     case "plugin-view":
       // The tab shows the view's unavailable state if its plugin no longer offers it.
       panels.openPluginView(ref, surface);
+      break;
+    case "issue":
+      panels.openIssue(ref, surface);
       break;
     case "side-chat":
       panels.openSideChat(ref, surface.threadId);

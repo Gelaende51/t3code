@@ -75,9 +75,12 @@ describe("V2 preview upgrade", () => {
         [93, "ProviderTurnAttemptIndex"],
         [94, "TurnItemMessageOrdinalIndex"],
         [95, "TurnItemInlineWorkOutput"],
-        [96, "PluginInstallations"],
-        [97, "PluginEventCursors"],
-        [98, "PluginSettings"],
+        [96, "RepairStaleTitleRegeneration"],
+        [97, "IssueTrackerBindings"],
+        [98, "ActiveShellIndexIndexes"],
+        [99, "PluginInstallations"],
+        [100, "PluginEventCursors"],
+        [101, "PluginSettings"],
       ]);
       assert.deepStrictEqual(yield* runMigrations(), []);
       assert.deepStrictEqual(yield* sql`SELECT * FROM orchestration_v2_legacy_imports`, imports);
@@ -196,9 +199,12 @@ describe("V2 preview upgrade", () => {
         [93, "ProviderTurnAttemptIndex"],
         [94, "TurnItemMessageOrdinalIndex"],
         [95, "TurnItemInlineWorkOutput"],
-        [96, "PluginInstallations"],
-        [97, "PluginEventCursors"],
-        [98, "PluginSettings"],
+        [96, "RepairStaleTitleRegeneration"],
+        [97, "IssueTrackerBindings"],
+        [98, "ActiveShellIndexIndexes"],
+        [99, "PluginInstallations"],
+        [100, "PluginEventCursors"],
+        [101, "PluginSettings"],
       ]);
     }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
   );

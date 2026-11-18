@@ -123,7 +123,7 @@ import { Switch } from "../ui/switch";
 import { toastManager } from "../ui/toast";
 import { PluginContributionsList } from "./PluginContributions";
 import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
-import { searchableSetting } from "./settingsSearch";
+import { useSearchableSetting } from "./settingsSearch";
 import { useSettingsScope } from "./SettingsScopeContext";
 
 const TONE_BADGE = {
@@ -194,6 +194,7 @@ function useRefreshOnChange(key: string | null, refresh: () => void) {
 }
 
 export function PluginsSettings() {
+  const searchableSetting = useSearchableSetting();
   const { scope, environments } = useSettingsScope();
   // An older server has no catalogue, so its section is not shown at all.
   const supported = environments.filter(

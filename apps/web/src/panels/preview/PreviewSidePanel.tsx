@@ -1,3 +1,4 @@
+import { useGT } from "gt-react";
 import { AuthPreviewOperateScope } from "@t3tools/contracts";
 
 import { PreviewPanelShell } from "~/components/preview/PreviewPanelShell";
@@ -17,6 +18,7 @@ export default function PreviewSidePanel({ tabId, configuredUrls }: PreviewSideP
   const { threadRef, visible, sendAnnotation } = usePanelHost();
   // The desktop app hosts browsers itself; other clients need an environment that runs them.
   const available = usePreviewAvailable(threadRef.environmentId);
+  const gt = useGT();
   const canOperatePreview = useEnvironmentScope(threadRef.environmentId, AuthPreviewOperateScope);
   if (!canOperatePreview || !available) {
     return (
@@ -24,8 +26,8 @@ export default function PreviewSidePanel({ tabId, configuredUrls }: PreviewSideP
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
           <p className="max-w-sm text-sm text-muted-foreground">
             {canOperatePreview
-              ? "Preview is only available in the T3 Code desktop app."
-              : "Pair this client again with preview access to control browser previews."}
+              ? gt("Preview is only available in the T3 Code desktop app.")
+              : gt("Pair this client again with preview access to control browser previews.")}
           </p>
         </div>
       </PreviewPanelShell>

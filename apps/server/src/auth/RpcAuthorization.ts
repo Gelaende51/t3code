@@ -3,6 +3,7 @@ import {
   PLUGIN_MANAGEMENT_REQUIRED_SCOPES,
   type DeviceListInput,
   clientRpcRequiredScopes,
+  containsSecretReference,
   authScopeRequiredResponse,
   AssetCreateUrlInput,
   AuthAccessReadScope,
@@ -162,6 +163,14 @@ export const RPC_REQUIRED_SCOPES = {
   [WS_METHODS.pullRequestsStack]: AuthOrchestrationReadScope,
   [WS_METHODS.pullRequestsLinkedThreads]: AuthOrchestrationReadScope,
   [WS_METHODS.pullRequestsDetail]: AuthOrchestrationReadScope,
+  [WS_METHODS.issuesList]: AuthOrchestrationReadScope,
+  [WS_METHODS.issuesDetail]: AuthOrchestrationReadScope,
+  [WS_METHODS.issuesComments]: AuthOrchestrationReadScope,
+  [WS_METHODS.issuesTemplates]: AuthOrchestrationReadScope,
+  [WS_METHODS.issuesCandidates]: AuthOrchestrationReadScope,
+  [WS_METHODS.issueTrackersList]: AuthOrchestrationReadScope,
+  [WS_METHODS.issueTrackersConnect]: AuthSettingsWriteScope,
+  [WS_METHODS.issueTrackersBindProject]: AuthSettingsWriteScope,
   [WS_METHODS.pullRequestsPreview]: AuthOrchestrationReadScope,
   [WS_METHODS.pullRequestsChecks]: AuthOrchestrationReadScope,
   [WS_METHODS.pullRequestsActivity]: AuthOrchestrationReadScope,
@@ -322,6 +331,15 @@ const requiredScopesForRpcCall = (
     ];
   }
   if (method === WS_METHODS.serverUpdateSettings) return requiredScopesForSettingsUpdate(payload);
+  // These send the credential they are given to a URL the caller names, as a saved setting would.
+  if (
+    (method === WS_METHODS.deviceSimlockIdentity ||
+      method === WS_METHODS.deviceEasAccount ||
+      method === WS_METHODS.serverListTextGeneratorModels) &&
+    containsSecretReference(payload)
+  ) {
+    return [AuthSettingsWriteScope, AuthProvidersManageScope];
+  }
   if (method === WS_METHODS.projectsMutate) {
     return requiredScopesForProjectMutation(decodeProjectMutation(payload));
   }
